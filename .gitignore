@@ -1,0 +1,23 @@
+# Secrets
+.env
+credentials.json
+token.json
+
+# Temporary/intermediate artifacts
+.tmp/
+framer_extracts/
+
+# Media optimization workflow
+input/
+output/
+media_optimization/media_optimization_input/
+media_optimization/Media_optimization_output/
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# OS/editor noise
+.DS_Store
