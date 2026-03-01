@@ -1,0 +1,4 @@
+interface:
+  display_name: "FigJam Workflow Diagramming"
+  short_description: "Build documentation-grade LR workflow diagrams in FigJam"
+  default_prompt: "Use $figjam-workflow-diagramming to produce a documentation-grade LR workflow diagram in FigJam. Analyze the workflow first, then document each step with action, artifacts, controls, tools/APIs/frameworks, outputs, transition conditions, and blockers."

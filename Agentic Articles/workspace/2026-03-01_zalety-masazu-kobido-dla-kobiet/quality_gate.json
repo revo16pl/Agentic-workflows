@@ -1,0 +1,143 @@
+{
+  "version": "2.1",
+  "updated_at": "2026-03-01T12:47:50+00:00",
+  "overall_pass": true,
+  "hard_gates": [
+    "polish_title_naturalness_pass",
+    "polish_collocation_pass",
+    "polish_grammar_pass",
+    "polish_diacritics_pass",
+    "polish_punctuation_pass",
+    "polish_fluency_ml_pass",
+    "structure_variance_pass_v2",
+    "semantic_rewrite_pass_v2",
+    "forbidden_phrase_pass",
+    "specificity_pass",
+    "voice_authenticity_pass",
+    "rewrite_loop_pass",
+    "evidence_provenance_pass",
+    "skills_policy_pass",
+    "hard_block_export_pass"
+  ],
+  "gates": {
+    "polish_diacritics_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_language.py",
+      "details": "diacritics=570, letters=8693, ratio=0.0656",
+      "updated_at": "2026-03-01T12:46:54+00:00"
+    },
+    "polish_grammar_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_language.py",
+      "details": "issues_after=0, allowed_issues=7",
+      "updated_at": "2026-03-01T12:46:54+00:00"
+    },
+    "polish_title_naturalness_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_naturalness.py",
+      "details": "No blocked title patterns.",
+      "updated_at": "2026-03-01T12:46:54+00:00"
+    },
+    "polish_collocation_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_naturalness.py",
+      "details": "No blocked collocations.",
+      "updated_at": "2026-03-01T12:46:54+00:00"
+    },
+    "polish_punctuation_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_naturalness.py",
+      "details": "No punctuation issues.",
+      "updated_at": "2026-03-01T12:46:54+00:00"
+    },
+    "structure_variance_pass_v2": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_naturalness.py",
+      "details": "sentence_cv=0.6352, paragraph_cv=0.6582, bucket_share=0.1712",
+      "updated_at": "2026-03-01T12:46:54+00:00"
+    },
+    "semantic_rewrite_pass_v2": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_naturalness.py",
+      "details": "changed_ratio=0.9129, changed_paragraphs=73",
+      "updated_at": "2026-03-01T12:46:54+00:00"
+    },
+    "forbidden_phrase_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_humanization.py",
+      "details": "",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "structure_variance_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_humanization.py",
+      "details": "",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "specificity_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_humanization.py",
+      "details": "",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "voice_authenticity_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_humanization.py",
+      "details": "",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "rewrite_loop_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_humanization.py",
+      "details": "",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "detector_ensemble_pass": {
+      "status": "PASS",
+      "severity": "advisory",
+      "source": "check_humanization.py",
+      "details": "mean_ai_risk=0.0055, max_single_ai_risk=0.0081",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "skills_policy_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_workflow_context.py",
+      "details": "All required skills are loaded and applied.",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "evidence_provenance_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_workflow_context.py",
+      "details": "serp_urls: 10/10 (ok) | keyword_phrases: 35/30 (ok) | paa_questions: 10/10 (ok) | trend_queries: 7/5 (ok)",
+      "updated_at": "2026-03-01T12:46:16+00:00"
+    },
+    "polish_fluency_ml_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "check_polish_fluency_ml.py",
+      "details": "ppl=7.8377, threshold=35.0000, model=dkleczek/bert-base-polish-cased-v1, samples=220",
+      "updated_at": "2026-03-01T12:47:39+00:00"
+    },
+    "hard_block_export_pass": {
+      "status": "PASS",
+      "severity": "hard",
+      "source": "article_workflow_state",
+      "details": "Derived from all hard gates.",
+      "updated_at": "2026-03-01T12:47:50+00:00"
+    }
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "version": "2.1",
+  "data_mode": "external_only",
+  "topic": "Zalety masażu Kobido dla kobiet",
+  "company": "studio balans",
+  "generated_at": "2026-03-01",
+  "minimum_dataset": {
+    "serp_top10_urls": 10,
+    "keyword_phrases": 30,
+    "paa_questions": 10,
+    "trend_queries": 5
+  },
+  "serp_urls": [
+    "https://swiatzdrowia.pl/artykuly/masaz-kobido-jakie-sa-efekty-i-jak-czesto-go-stosowac/",
+    "https://terapiawisceralna.pl/masaz-twarzy-kobido/",
+    "https://manualni.com/co-daje-masaz-kobido-7-powodow-dla-ktorych-warto-go-wykonywac/",
+    "https://iqmedycyna.pl/uroda/masaz-kobido-zalety-skutki-uboczne-i-przeciwwskazania-dla-kogo-jest-masaz-kobido/",
+    "https://uroda.abczdrowie.pl/masaz-kobido/6953425257520032a",
+    "https://www.medicover.pl/o-zdrowiu/masaz-kobido-lifting-twarzy-bez-skalpela,9794,n,168",
+    "https://kosmetycznesekrety.pl/masaz-kobido-co-to-jest-i-jakie-daje-efekty/",
+    "https://www.drszczyt.pl/zabiegi/kobido",
+    "https://beautyestetic.com.pl/masaz-kobido-naturalny-lifting-bez-skalpela-kompletny-przewodnik",
+    "https://www.acusmed.pl/blog/masaz-twarzy-rodzaje-i-efekty/"
+  ],
+  "keyword_phrases": [
+    "masaż kobido",
+    "masaż kobido cena",
+    "masaż kobido co to",
+    "masaż kobido efekty",
+    "masaż kobido efekty przed i po",
+    "masaż kobido przeciwwskazania",
+    "masaż kobido ile zabiegów",
+    "masaż kobido niepołomice",
+    "masaż kobido kraków",
+    "kobido masaż twarzy",
+    "kobido masaż twarzy efekty",
+    "kobido masaż twarzy cena",
+    "kobido efekty",
+    "kobido efekty po 1 zabiegu",
+    "kobido efekty po ilu zabiegach",
+    "kobido efekty uboczne",
+    "kobido dla kogo",
+    "kobido przeciwwskazania",
+    "kobido przeciwwskazania ciąża",
+    "kobido ile zabiegów",
+    "ile zabiegów kobido na twarz",
+    "ile zabiegów kobido żeby był efekt",
+    "japoński masaż twarzy kobido",
+    "japoński lifting twarzy",
+    "masaż twarzy liftingujący",
+    "masaż twarzy na zmarszczki",
+    "masaż twarzy na zmarszczki efekty",
+    "masaż twarzy youtube",
+    "masaż twarzy szyi i dekoltu",
+    "masaż twarzy korugi",
+    "masaż twarzy w domu",
+    "masaż twarzy kobido dla kogo",
+    "kobido cena zabiegu",
+    "kobido opinie",
+    "kobido skutki uboczne"
+  ],
+  "paa_questions": [
+    "Na czym polega masaż Kobido?",
+    "Jakie efekty Kobido można zobaczyć po pierwszej sesji?",
+    "Ile zabiegów Kobido zwykle potrzeba, żeby utrwalić efekt?",
+    "Jak często wykonywać Kobido w serii startowej?",
+    "Dla kogo Kobido będzie dobrym wyborem?",
+    "Jakie są przeciwwskazania do masażu Kobido?",
+    "Czy masaż Kobido boli?",
+    "Czy Kobido może pomóc przy napiętej szczęce?",
+    "Czy Kobido można łączyć z innymi zabiegami twarzy?",
+    "Ile trwa jedna sesja Kobido?"
+  ],
+  "trend_queries": [
+    "masaż kobido cena",
+    "masaż kobido warszawa",
+    "masaż kobido opinie",
+    "masaż kobido co to jest",
+    "masaż kobido skutki uboczne",
+    "masaż twarzy szyi i dekoltu",
+    "masaż twarzy korugi"
+  ],
+  "sources": [
+    {
+      "source_tool": "duckduckgo_search",
+      "query_seed": "masaż kobido zalety",
+      "url": "https://duckduckgo.com/?q=masa%C5%BC+kobido+zalety",
+      "date_range": "snapshot on pull date",
+      "pulled_at": "2026-03-01T12:55:00+01:00"
+    },
+    {
+      "source_tool": "google_suggest_api",
+      "query_seed": "masaż kobido, kobido efekty, kobido przeciwwskazania",
+      "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=pl&q=masa%C5%BC%20kobido",
+      "date_range": "snapshot on pull date",
+      "pulled_at": "2026-03-01T12:56:00+01:00"
+    },
+    {
+      "source_tool": "google_trends_pytrends",
+      "query_seed": "masaż kobido, kobido, masaż twarzy",
+      "url": "https://trends.google.com/trends/",
+      "date_range": "today 12-m",
+      "pulled_at": "2026-03-01T12:58:00+01:00"
+    },
+    {
+      "source_tool": "pubmed_eutils",
+      "query_seed": "facial massage anxiety mood",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/19129675/",
+      "date_range": "all time",
+      "pulled_at": "2026-03-01T13:00:00+01:00"
+    },
+    {
+      "source_tool": "pubmed_eutils",
+      "query_seed": "facial massage blood flow skin study",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/34032318/",
+      "date_range": "all time",
+      "pulled_at": "2026-03-01T13:00:30+01:00"
+    },
+    {
+      "source_tool": "pubmed_eutils",
+      "query_seed": "massage therapy anxiety systematic review",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/36680488/",
+      "date_range": "last 5 years",
+      "pulled_at": "2026-03-01T13:01:00+01:00"
+    },
+    {
+      "source_tool": "pubmed_eutils",
+      "query_seed": "massage therapy cancer pain quality of life anxiety systematic review",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39558520/",
+      "date_range": "last 5 years",
+      "pulled_at": "2026-03-01T13:01:20+01:00"
+    },
+    {
+      "source_tool": "nccih",
+      "query_seed": "massage therapy what you need to know",
+      "url": "https://www.nccih.nih.gov/health/massage-therapy-what-you-need-to-know",
+      "date_range": "current guidance",
+      "pulled_at": "2026-03-01T13:01:40+01:00"
+    },
+    {
+      "source_tool": "serp_competitor_page",
+      "query_seed": "kobido dla kogo",
+      "url": "https://www.medicover.pl/o-zdrowiu/masaz-kobido-lifting-twarzy-bez-skalpela,9794,n,168",
+      "date_range": "snapshot on pull date",
+      "pulled_at": "2026-03-01T13:02:00+01:00"
+    },
+    {
+      "source_tool": "serp_competitor_page",
+      "query_seed": "masaż twarzy rodzaje i efekty",
+      "url": "https://www.acusmed.pl/blog/masaz-twarzy-rodzaje-i-efekty/",
+      "date_range": "snapshot on pull date",
+      "pulled_at": "2026-03-01T13:02:20+01:00"
+    }
+  ]
+}
