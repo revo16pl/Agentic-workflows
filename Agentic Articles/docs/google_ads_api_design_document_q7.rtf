@@ -1,0 +1,107 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+\fs24
+\b Google Ads API Tool Design Documentation (Q7)\b0\par
+\par
+\b 1. Tool Purpose\b0\par
+This internal tool supports SEO content planning for two local Polish businesses. Its goal is to improve article topic selection using real keyword demand data instead of guesses.\par
+\par
+Main use case:\par
+- gather keyword ideas and historical keyword metrics for Polish market (pl-PL, PL)\par
+- map search intent for article briefs\par
+- support editorial planning for SEO articles\par
+\par
+This tool is not a campaign management platform. It is a research support layer for content strategy.\par
+\par
+\b 2. Who Uses the Tool\b0\par
+Access model:\par
+- internal users only (owner and authorized team collaborators)\par
+- no public user access\par
+- no external client self-service dashboard\par
+\par
+Users operate the tool through local scripts in a controlled project environment.\par
+\par
+\b 3. Google Ads API Scope and Endpoints Used\b0\par
+The tool uses Google Ads API only for keyword research.\par
+\par
+Primary services:\par
+- KeywordPlanIdeaService.GenerateKeywordIdeas\par
+- KeywordPlanIdeaService.GenerateKeywordHistoricalMetrics\par
+\par
+Data points consumed:\par
+- keyword text\par
+- average monthly searches\par
+- competition level\par
+- top of page bid ranges (low/high)\par
+- language/location filtered outputs (Poland)\par
+\par
+Purpose of these calls:\par
+- build keyword clusters\par
+- improve intent matching\par
+- prioritize article topics\par
+\par
+\b 4. Explicitly Not Used\b0\par
+The tool does not use Google Ads API for:\par
+- campaign creation or editing\par
+- ad group creation or editing\par
+- ad creation or editing\par
+- budget or bidding automation\par
+- account billing operations\par
+- user/permission management in Google Ads\par
+- conversion tracking configuration\par
+- remarketing setup\par
+\par
+No automation is performed on paid campaign delivery.\par
+\par
+\b 5. System Architecture and Data Flow\b0\par
+High-level flow:\par
+1. Internal user provides topic seed (for example: local service topic in Polish).\par
+2. Tool calls Google Ads API keyword planning endpoints.\par
+3. Tool normalizes returned metrics into local research artifacts.\par
+4. Results are merged with SERP and trends data from other providers.\par
+5. Research outputs are used to prepare article brief and content outline.\par
+6. Final article draft is reviewed and exported to Google Docs.\par
+\par
+Data handling:\par
+- keyword metrics are stored in local workspace artifacts (JSON/Markdown)\par
+- data is used for planning and QA only\par
+- no resale or republishing of raw API output\par
+\par
+\b 6. Security and Access Controls\b0\par
+Authentication and authorization:\par
+- OAuth 2.0 credentials are used for API access\par
+- developer token is stored in environment variables\par
+- refresh tokens are used only in trusted local runtime\par
+\par
+Secret handling:\par
+- secrets are kept in local .env and credential files excluded from git\par
+- tokens are never hardcoded in source code\par
+- tokens are never shared publicly\par
+\par
+Operational controls:\par
+- only authorized internal users can run scripts\par
+- no multi-tenant public exposure\par
+- no end-user direct access to credentials\par
+\par
+\b 7. Compliance and Data Minimization\b0\par
+Data minimization principles:\par
+- only required fields are fetched\par
+- only keyword research metrics needed for editorial planning are retained\par
+- no unnecessary personal data processing\par
+\par
+Usage constraints:\par
+- API output supports internal SEO planning decisions\par
+- tool behavior remains read-focused for keyword research\par
+\par
+\b 8. Reliability and Error Handling\b0\par
+The tool includes:\par
+- input validation (topic, locale, geo parameters)\par
+- retry and backoff for temporary provider failures\par
+- hard fail behavior when critical research data is unavailable\par
+- explicit logs for troubleshooting and auditability\par
+\par
+If the keyword data fetch fails, article generation is blocked until research quality gates pass.\par
+\par
+\b 9. Summary\b0\par
+This is an internal SEO research tool that uses Google Ads API in a limited and controlled way for keyword planning only. It does not manage ads or billing, does not expose public access, and applies OAuth-based security with strict secret handling.\par
+}

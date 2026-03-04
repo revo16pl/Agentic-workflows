@@ -406,6 +406,7 @@ def write_iteration_feedback(workspace: Path, errors: list[str]) -> Path:
         "competitor_matrix_pass": "Uzupełnij `competitor_matrix` (min. 10 URL) i `content_gaps` (min. 5).",
         "research_data_freshness_pass": "Odśwież research (`execution/research_fetch.py`), aby `pulled_at` było aktualne.",
         "research_hard_block_pass": "Uruchom `execution/check_research_quality.py` i doprowadź wszystkie research gate'y do PASS.",
+        "topic_from_approved_plan_pass": "Uruchom artykuł z `execution/prepare_article_from_queue.py` na rekordzie `RUN_QUEUE` z `workflow_b_ready=yes` i statusem approved.",
     }
 
     for error in errors:
@@ -762,6 +763,7 @@ def main() -> int:
         "competitor_matrix_pass",
         "research_data_freshness_pass",
         "research_hard_block_pass",
+        "topic_from_approved_plan_pass",
         "hard_block_export_pass",
     ]
     set_hard_gate_set(workspace=workspace, hard_gate_names=hard_gate_order)

@@ -11,6 +11,19 @@
   - `providers`, `query_seeds`, `keyword_metrics`, `serp_results`, `trend_points`, `competitor_matrix`.
 - Eksport do Google Docs zostaje zablokowany, jeśli `research_hard_block_pass != PASS`.
 
+## Update v3.1 (Workflow A -> Workflow B Integration)
+- Dodano osobny Workflow A (bi-weekly content planning sprint) z artefaktami:
+  - `Agentic Articles/planning/{YYYY-MM-DD}_sprint/`
+  - `planning_dataset.json`, `content_plan_candidates.csv`, `content_plan_backlog.csv`, `planning_gate.json`, `run_queue.csv`.
+- Workflow B startuje wyłącznie z `RUN_QUEUE` przez:
+  - `python3 execution/prepare_article_from_queue.py --queue-row-id \"rq-0001\"`
+- Dodano hard gate `topic_from_approved_plan_pass`:
+  - artykuł musi mieć w `run_context.md` referencję do approved topicu z Workflow A.
+- Dodano strict planning gates (Workflow A):
+  - keyword/serp/paa/trends coverage,
+  - cluster quality,
+  - backlog minimum per company.
+
 ## 1. Cel SOP
 Zdefiniowac powtarzalny, decision-complete proces tworzenia artykulow SEO dla rynku PL lokalnego, z naciskiem na jakosc merytoryczna, intent fit i wynik biznesowy.
 

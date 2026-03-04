@@ -47,7 +47,15 @@ def write_text(path: Path, content: str, force: bool) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def ensure_run_context_defaults(path: Path, topic: str, company: str) -> None:
+def ensure_run_context_defaults(
+    path: Path,
+    topic: str,
+    company: str,
+    planning_sprint_id: str = "",
+    planning_topic_id: str = "",
+    planning_row_status: str = "",
+    planning_queue_path: str = "",
+) -> None:
     """Backfill required v3.0 fields without overwriting existing run context."""
     defaults = {
         "topic": topic,
@@ -62,6 +70,10 @@ def ensure_run_context_defaults(path: Path, topic: str, company: str) -> None:
         "research_fetch_started_at": "",
         "research_fetch_finished_at": "",
         "research_fetch_status": "",
+        "planning_sprint_id": planning_sprint_id,
+        "planning_topic_id": planning_topic_id,
+        "planning_row_status": planning_row_status,
+        "planning_queue_path": planning_queue_path,
     }
 
     if not path.exists():
@@ -248,6 +260,10 @@ def create_workspace(
     workspace_root: Path,
     docs_root: Path,
     force: bool,
+    planning_sprint_id: str = "",
+    planning_topic_id: str = "",
+    planning_row_status: str = "",
+    planning_queue_path: str = "",
 ) -> Path:
     workspace_root.mkdir(parents=True, exist_ok=True)
     slug = slugify(topic)
@@ -285,10 +301,22 @@ def create_workspace(
             "- research_fetch_started_at: \n"
             "- research_fetch_finished_at: \n"
             "- research_fetch_status: \n"
+            f"- planning_sprint_id: {planning_sprint_id}\n"
+            f"- planning_topic_id: {planning_topic_id}\n"
+            f"- planning_row_status: {planning_row_status}\n"
+            f"- planning_queue_path: {planning_queue_path}\n"
         )
         write_text(run_context_path, run_context_content, force=True)
     else:
-        ensure_run_context_defaults(run_context_path, topic=topic, company=company)
+        ensure_run_context_defaults(
+            run_context_path,
+            topic=topic,
+            company=company,
+            planning_sprint_id=planning_sprint_id,
+            planning_topic_id=planning_topic_id,
+            planning_row_status=planning_row_status,
+            planning_queue_path=planning_queue_path,
+        )
     return workspace_dir
 
 
@@ -324,6 +352,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Overwrite existing artifact files if present.",
     )
+    parser.add_argument("--planning-sprint-id", default="", help="Planning sprint id from Workflow A.")
+    parser.add_argument("--planning-topic-id", default="", help="Topic id from content planning backlog/queue.")
+    parser.add_argument(
+        "--planning-row-status",
+        default="",
+        help="Planning row status (expected: approved) used by Workflow B hard checks.",
+    )
+    parser.add_argument(
+        "--planning-queue-path",
+        default="",
+        help="Absolute path to run_queue.csv used to source this article topic.",
+    )
     return parser.parse_args()
 
 
@@ -341,6 +381,10 @@ def main() -> int:
         workspace_root=args.workspace_root.resolve(),
         docs_root=args.docs_root.resolve(),
         force=args.force,
+        planning_sprint_id=args.planning_sprint_id.strip(),
+        planning_topic_id=args.planning_topic_id.strip(),
+        planning_row_status=args.planning_row_status.strip(),
+        planning_queue_path=args.planning_queue_path.strip(),
     )
 
     print(f"Workspace ready: {workspace_dir}")

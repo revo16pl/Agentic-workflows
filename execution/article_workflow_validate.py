@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import re
@@ -79,6 +80,7 @@ REQUIRED_HARD_GATES = [
     "competitor_matrix_pass",
     "research_data_freshness_pass",
     "research_hard_block_pass",
+    "topic_from_approved_plan_pass",
     "hard_block_export_pass",
 ]
 
@@ -457,6 +459,90 @@ def parse_comma_list(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def validate_topic_from_approved_plan(workspace: Path, result: ValidationResult) -> None:
+    context = parse_run_context(workspace / "run_context.md")
+    planning_sprint_id = context.get("planning_sprint_id", "").strip()
+    planning_topic_id = context.get("planning_topic_id", "").strip()
+    planning_row_status = context.get("planning_row_status", "").strip().lower()
+    planning_queue_path_raw = context.get("planning_queue_path", "").strip()
+
+    if not planning_sprint_id:
+        result.add_error(
+            "topic_from_approved_plan",
+            "Missing planning_sprint_id in run_context.md. Article must be sourced from Workflow A queue.",
+        )
+        return
+    if not planning_topic_id:
+        result.add_error(
+            "topic_from_approved_plan",
+            "Missing planning_topic_id in run_context.md. Article must map to approved topic row.",
+        )
+        return
+    if planning_row_status != "approved":
+        result.add_error(
+            "topic_from_approved_plan",
+            "planning_row_status must be 'approved' in run_context.md.",
+        )
+        return
+    if not planning_queue_path_raw:
+        result.add_error(
+            "topic_from_approved_plan",
+            "Missing planning_queue_path in run_context.md.",
+        )
+        return
+
+    queue_path = Path(planning_queue_path_raw).expanduser()
+    if not queue_path.is_absolute():
+        queue_path = (workspace.parent.parent / queue_path).resolve()
+    if not queue_path.exists():
+        result.add_error(
+            "topic_from_approved_plan",
+            f"planning_queue_path does not exist: {queue_path}",
+        )
+        return
+
+    matched_row: dict[str, str] | None = None
+    try:
+        with queue_path.open("r", encoding="utf-8-sig", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                if str(row.get("topic_id", "")).strip() == planning_topic_id:
+                    matched_row = {key: str(value).strip() for key, value in row.items()}
+                    break
+    except Exception as exc:
+        result.add_error("topic_from_approved_plan", f"Cannot read planning queue file: {exc}")
+        return
+
+    if not matched_row:
+        result.add_error(
+            "topic_from_approved_plan",
+            f"planning_topic_id '{planning_topic_id}' not found in queue file: {queue_path}",
+        )
+        return
+
+    if matched_row.get("workflow_b_ready", "").lower() != "yes":
+        result.add_error(
+            "topic_from_approved_plan",
+            f"Queue row {planning_topic_id} is not workflow-ready ({matched_row.get('reason_if_no', 'unknown reason')}).",
+        )
+        return
+
+    brief_path = workspace / "article_brief.md"
+    if brief_path.exists():
+        brief = read_text(brief_path)
+        meta = parse_brief_metadata(brief)
+        brief_company = str(meta.get("company", "")).strip().lower()
+        queue_company = matched_row.get("company", "").strip().lower()
+        if brief_company and queue_company and brief_company != queue_company:
+            result.add_error(
+                "topic_from_approved_plan",
+                f"Company mismatch between brief ('{brief_company}') and queue ('{queue_company}').",
+            )
+            return
+
+    result.add_pass("topic_from_approved_plan")
 
 
 def validate_skills_policy(workspace: Path, result: ValidationResult) -> None:
@@ -876,6 +962,7 @@ def validate_workspace(workspace: Path, mode: str) -> ValidationResult:
             result.add_warning("qa_report.md has marked critical failures (non-blocking): " + "; ".join(critical_failures))
 
     validate_skills_policy(workspace, result)
+    validate_topic_from_approved_plan(workspace, result)
     validate_quality_gate(workspace, result)
 
     publish_path = workspace / "publish_ready.md"

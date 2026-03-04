@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from pathlib import Path
 
@@ -106,6 +107,90 @@ def evaluate_skills(workspace: Path) -> tuple[bool, list[str]]:
 
     if ok:
         messages.append("All required skills are loaded and applied.")
+    return ok, messages
+
+
+def evaluate_planning_reference(workspace: Path) -> tuple[bool, list[str]]:
+    context = parse_run_context(workspace / "run_context.md")
+    messages: list[str] = []
+    ok = True
+
+    planning_sprint_id = context.get("planning_sprint_id", "").strip()
+    planning_topic_id = context.get("planning_topic_id", "").strip()
+    planning_row_status = context.get("planning_row_status", "").strip().lower()
+    planning_queue_path_raw = context.get("planning_queue_path", "").strip()
+
+    if not planning_sprint_id:
+        ok = False
+        messages.append("Missing planning_sprint_id in run_context.md.")
+    if not planning_topic_id:
+        ok = False
+        messages.append("Missing planning_topic_id in run_context.md.")
+    if planning_row_status != "approved":
+        ok = False
+        messages.append("planning_row_status in run_context.md must be 'approved'.")
+    if not planning_queue_path_raw:
+        ok = False
+        messages.append("Missing planning_queue_path in run_context.md.")
+        return ok, messages
+
+    queue_path = Path(planning_queue_path_raw).expanduser()
+    if not queue_path.is_absolute():
+        queue_path = (workspace.parent.parent / queue_path).resolve()
+    if not queue_path.exists():
+        ok = False
+        messages.append(f"planning_queue_path does not exist: {queue_path}")
+        return ok, messages
+
+    queue_row: dict[str, str] | None = None
+    try:
+        with queue_path.open("r", encoding="utf-8-sig", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                if str(row.get("topic_id", "")).strip() == planning_topic_id:
+                    queue_row = {key: str(value).strip() for key, value in row.items()}
+                    break
+    except Exception as exc:
+        ok = False
+        messages.append(f"Cannot read queue file: {exc}")
+        return ok, messages
+
+    if not queue_row:
+        ok = False
+        messages.append(f"planning_topic_id '{planning_topic_id}' not found in queue file.")
+        return ok, messages
+
+    if queue_row.get("workflow_b_ready", "").lower() != "yes":
+        ok = False
+        messages.append(
+            "Queue row is not workflow_b_ready=yes: "
+            + (queue_row.get("reason_if_no", "unknown reason") or "unknown reason")
+        )
+
+    brief_path = workspace / "article_brief.md"
+    if brief_path.exists():
+        text = brief_path.read_text(encoding="utf-8")
+        yaml_block = text.split("```yaml")
+        if len(yaml_block) > 1 and "```" in yaml_block[1]:
+            yaml_text = yaml_block[1].split("```", 1)[0]
+            company_line = ""
+            topic_line = ""
+            for line in yaml_text.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("company:"):
+                    company_line = stripped.split(":", 1)[1].strip().strip('"').strip("'").lower()
+                if stripped.startswith("topic:"):
+                    topic_line = stripped.split(":", 1)[1].strip().strip('"').strip("'").lower()
+            queue_company = queue_row.get("company", "").lower()
+            queue_topic = queue_row.get("article_title_working", "").lower()
+            if company_line and queue_company and company_line != queue_company:
+                ok = False
+                messages.append("Company mismatch between article_brief and queue row.")
+            if topic_line and queue_topic and topic_line != queue_topic:
+                messages.append("Topic in brief differs from queue title (warning only if intentional).")
+
+    if ok:
+        messages.append("Planning reference is present and consistent with approved queue row.")
     return ok, messages
 
 
@@ -226,12 +311,15 @@ def write_report(path: Path, payload: dict[str, object]) -> None:
         "## Gates",
         f"- skills_policy_pass: {'PASS' if payload['skills_policy_pass'] else 'FAIL'}",
         f"- evidence_provenance_pass: {'PASS' if payload['evidence_provenance_pass'] else 'FAIL'}",
+        f"- topic_from_approved_plan_pass: {'PASS' if payload['topic_from_approved_plan_pass'] else 'FAIL'}",
         "",
         "## Skill checks",
     ]
     lines.extend([f"- {x}" for x in payload["skills_messages"]])  # type: ignore[index]
     lines.extend(["", "## Evidence checks"])
     lines.extend([f"- {x}" for x in payload["evidence_messages"]])  # type: ignore[index]
+    lines.extend(["", "## Planning checks"])
+    lines.extend([f"- {x}" for x in payload["planning_messages"]])  # type: ignore[index]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -244,27 +332,32 @@ def main() -> int:
 
     skills_ok, skills_messages = evaluate_skills(workspace)
     evidence_ok, evidence_messages = evaluate_evidence(workspace)
+    planning_ok, planning_messages = evaluate_planning_reference(workspace)
 
     set_many_gates(
         workspace=workspace,
         gates={
             "skills_policy_pass": skills_ok,
             "evidence_provenance_pass": evidence_ok,
+            "topic_from_approved_plan_pass": planning_ok,
         },
         source="check_workflow_context.py",
         severity="hard",
         details={
             "skills_policy_pass": " | ".join(skills_messages),
             "evidence_provenance_pass": " | ".join(evidence_messages),
+            "topic_from_approved_plan_pass": " | ".join(planning_messages),
         },
     )
 
     payload = {
-        "ok": skills_ok and evidence_ok,
+        "ok": skills_ok and evidence_ok and planning_ok,
         "skills_policy_pass": skills_ok,
         "evidence_provenance_pass": evidence_ok,
+        "topic_from_approved_plan_pass": planning_ok,
         "skills_messages": skills_messages,
         "evidence_messages": evidence_messages,
+        "planning_messages": planning_messages,
     }
     report_path = workspace / args.report
     write_report(report_path, payload)
@@ -276,6 +369,7 @@ def main() -> int:
         print(f"Context report: {report_path}")
         print(f"- skills_policy_pass: {'PASS' if skills_ok else 'FAIL'}")
         print(f"- evidence_provenance_pass: {'PASS' if evidence_ok else 'FAIL'}")
+        print(f"- topic_from_approved_plan_pass: {'PASS' if planning_ok else 'FAIL'}")
     return 0 if payload["ok"] else 1
 
 

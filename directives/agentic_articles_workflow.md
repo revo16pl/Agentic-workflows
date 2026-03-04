@@ -4,6 +4,7 @@
 Create high-quality SEO articles (PL local market) with a repeatable process that balances search intent, factual quality, and business outcomes.
 
 ## Inputs
+- Approved queue row from Workflow A (`run_queue.csv` with `workflow_b_ready=yes`)
 - Completed article brief (`article_brief.md`)
 - Topic and business context
 - Optional local context (city/region)
@@ -12,12 +13,14 @@ Create high-quality SEO articles (PL local market) with a repeatable process tha
 ## Primary Documentation
 - `Agentic Articles/docs/article_workflow_research_2026.md`
 - `Agentic Articles/docs/seo_copywriting_workflow_v1.md`
+- `Agentic Articles/docs/content_planning_sop_v1.md`
 - `Agentic Articles/docs/article_brief_template.md`
 - `Agentic Articles/docs/article_qa_checklist.md`
 - `Agentic Articles/docs/company_context_profiles.md`
 
 ## Execution Scripts
 - `execution/article_workflow_init.py`
+- `execution/prepare_article_from_queue.py`
 - `execution/research_fetch.py`
 - `execution/check_research_quality.py`
 - `execution/article_workflow_validate.py`
@@ -29,19 +32,20 @@ Create high-quality SEO articles (PL local market) with a repeatable process tha
 - `execution/export_to_gdocs.py`
 
 ## Process (Artifact-driven)
-1. Fill brief
-2. Run automated external research fetch (`research_fetch.py`)
-3. Run research hard gate (`check_research_quality.py`)
-4. Confirm required skills are loaded/applied in run context
-5. Write draft v1
-6. Run Polish language auto-fix + grammar/diacritics gate
-7. Run Polish naturalness gate (title/collocations/punctuation/structure/rewrite)
-8. Run pre-trained ML fluency signal
-9. Run humanization + copy-editing gate
-10. Run workflow context gate
-11. Iterate: validate -> apply fixes -> revalidate (max 5 iterations)
-12. Mark package as ready for manual review
-13. Export QA-approved article to Google Docs
+1. Start from approved queue row (Workflow A) using `prepare_article_from_queue.py`
+2. Fill/refine brief
+3. Run automated external research fetch (`research_fetch.py`)
+4. Run research hard gate (`check_research_quality.py`)
+5. Confirm required skills are loaded/applied in run context
+6. Write draft v1
+7. Run Polish language auto-fix + grammar/diacritics gate
+8. Run Polish naturalness gate (title/collocations/punctuation/structure/rewrite)
+9. Run pre-trained ML fluency signal
+10. Run humanization + copy-editing gate
+11. Run workflow context gate
+12. Iterate: validate -> apply fixes -> revalidate (max 5 iterations)
+13. Mark package as ready for manual review
+14. Export QA-approved article to Google Docs
 
 ## Required Outputs (per article)
 - `article_brief.md`
@@ -63,6 +67,7 @@ Create high-quality SEO articles (PL local market) with a repeatable process tha
   - required skills listed in `run_context.md` (`skills_loaded`, `skills_applied`)
   - local installs present in `./skills/<skill>/SKILL.md`
 - `forbidden_phrase_pass`, `specificity_pass`, `voice_authenticity_pass`, `rewrite_loop_pass` must be `PASS`
+- `topic_from_approved_plan_pass` must be `PASS`
 - `hard_block_export_pass` must be `PASS`
 - `detector_ensemble_pass` is advisory only (warning, not sole blocker)
 - `publish_ready.md` status must be `Ready_for_manual_review` or `Approved`
@@ -87,10 +92,9 @@ Create high-quality SEO articles (PL local market) with a repeatable process tha
 
 ## Usage
 ```bash
-# 1) Initialize workspace for one article
-python3 execution/article_workflow_init.py \
-  --topic "Zalety treningu EMS w Niepolomicach" \
-  --company "studio balans"
+# 1) Initialize workspace from approved queue row (Workflow A)
+python3 execution/prepare_article_from_queue.py \
+  --queue-row-id "rq-0001"
 
 # 2) Fill artifacts manually/agentically in workspace
 # Agentic Articles/workspace/YYYY-MM-DD_topic-slug/

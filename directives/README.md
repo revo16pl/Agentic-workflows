@@ -12,3 +12,5 @@ Each directive should define:
 Examples:
 - `directives/scrape_website.md`
 - `directives/add_webhook.md`
+- `directives/content_planning_workflow.md`
+- `directives/agentic_articles_workflow.md`
