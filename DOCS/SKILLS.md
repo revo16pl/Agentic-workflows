@@ -55,10 +55,9 @@ When you create a new capability/workflow, update this file with:
 - `Agentic Articles/docs/article_workflow_research_2026.md`
 - `Agentic Articles/docs/seo_copywriting_workflow_v1.md`
 - `Agentic Articles/docs/article_brief_template.md`
-- `Agentic Articles/docs/article_qa_checklist.md`
 - `Agentic Articles/docs/company_context_profiles.md`
 
-**Output**: Per-article workspace with standardized artifacts (`article_brief.md`, `article_research_pack.md`, `research_evidence_manifest.json`, `quality_gate.json`, `qa_report.md`, etc.)
+**Output**: Per-article workflow with compact final artifacts (`article_research_pack.md`, `final_output.md`) plus Google Docs export link returned by the agent.
 
 ### Required External Skills (skills.sh / marketingskills)
 Workflow v2.1 wymaga tych skilli na etapie pisania i QA:
@@ -68,6 +67,15 @@ Workflow v2.1 wymaga tych skilli na etapie pisania i QA:
 - `seo-audit` (on-page SEO checks)
 - `schema-markup` (spójność schema z treścią)
 - `ai-seo` (LLM/snippet readiness)
+
+### YouTube Notes Workflow v3 (installed local skills)
+Skille wspierające jakość notatek i redakcję wideo-syntez:
+- `content-strategy` (architektura notatek i hierarchia informacji)
+- `copy-editing` (polish językowy, usuwanie szablonowego brzmienia)
+- `copywriting` (nagłówki, flow narracji, czytelność)
+- `prompt-engineering` (stabilizacja promptów dla pass 1 / pass 2)
+- `doc-coauthoring` (iteracyjna redakcja i QA dokumentu)
+- `find-skills` (wyszukiwanie dodatkowych skilli pod summarization/research synthesis)
 
 ---
 

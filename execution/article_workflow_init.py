@@ -27,10 +27,8 @@ REQUIRED_ARTIFACTS = [
     "article_research_pack.md",
     "research_evidence_manifest.json",
     "quality_gate.json",
-    "article_draft_v1.md",
-    "qa_report.md",
     "article_draft_v2.md",
-    "publish_ready.md",
+    "editorial_review.md",
 ]
 
 
@@ -47,10 +45,19 @@ def write_text(path: Path, content: str, force: bool) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def artifacts_for_profile(content_profile: str) -> list[str]:
+    return list(REQUIRED_ARTIFACTS)
+
+
 def ensure_run_context_defaults(
     path: Path,
     topic: str,
     company: str,
+    content_profile: str = "article",
+    source_url: str = "",
+    section_policy: str = "inherited",
+    section_labels: str = "",
+    subheading_length_target: str = "similar",
     planning_sprint_id: str = "",
     planning_topic_id: str = "",
     planning_row_status: str = "",
@@ -60,6 +67,11 @@ def ensure_run_context_defaults(
     defaults = {
         "topic": topic,
         "company": company,
+        "content_profile": content_profile,
+        "source_url": source_url,
+        "section_policy": section_policy,
+        "section_labels": section_labels,
+        "subheading_length_target": subheading_length_target,
         "created_at": dt.datetime.now().isoformat(timespec="seconds"),
         "workflow_version": "v3.0",
         "data_mode": "external_only",
@@ -70,6 +82,10 @@ def ensure_run_context_defaults(
         "research_fetch_started_at": "",
         "research_fetch_finished_at": "",
         "research_fetch_status": "",
+        "research_fallback_reason": "",
+        "research_confidence": "",
+        "company_profile_id": "",
+        "brand_voice_loaded": "",
         "planning_sprint_id": planning_sprint_id,
         "planning_topic_id": planning_topic_id,
         "planning_row_status": planning_row_status,
@@ -118,7 +134,13 @@ def ensure_run_context_defaults(
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
-def template_for(filename: str, topic: str, company: str, today: str) -> str:
+def template_for(
+    filename: str,
+    topic: str,
+    company: str,
+    today: str,
+    content_profile: str = "article",
+) -> str:
     if filename == "article_research_pack.md":
         return (
             "# article_research_pack.md\n\n"
@@ -222,28 +244,56 @@ def template_for(filename: str, topic: str, company: str, today: str) -> str:
             "}\n"
         )
 
-    if filename == "article_draft_v1.md":
-        return "# article_draft_v1.md\n\n"
-
     if filename == "article_draft_v2.md":
+        if content_profile == "service_page":
+            return (
+                "# article_draft_v2.md\n\n"
+                "## Subheading\n"
+                "_Wpisz lead o podobnej dlugosci do aktualnej strony uslugowej._\n\n"
+                "## Opis\n"
+                "### Akapit 1\n"
+                "\n"
+                "### Akapit 2\n"
+                "\n"
+                "### Akapit 3\n"
+                "\n"
+                "## Najważniejsze informacje\n"
+                "### Wskazania\n"
+                "- \n"
+                "### Przeciwwskazania i bezpieczeństwo\n"
+                "- \n"
+                "### Zalecenia przed i po\n"
+                "- \n"
+                "### FAQ\n"
+                "- \n"
+            )
         return "# article_draft_v2.md\n\n"
 
-    if filename == "publish_ready.md":
+    if filename == "editorial_review.md":
+        editorial_template = DEFAULT_DOCS_ROOT / "editorial_review_template.md"
+        if editorial_template.exists():
+            return editorial_template.read_text(encoding="utf-8")
         return (
-            "# publish_ready.md\n\n"
-            "status: Draft\n"
-            f"company: {company}\n"
-            f"topic: {topic}\n"
-            f"review_date: {today}\n"
-            "reviewer: \n"
-            "notes: \n"
+            "# editorial_review.md\n\n"
+            "## Pass 1: Logic and Sense\n"
+            "- weird_phrases:\n"
+            "- logic_gaps:\n"
+            "- rewrite_decisions:\n\n"
+            "## Pass 2: Copywriting Sweep\n"
+            "- clarity_fixes:\n"
+            "- benefit_fixes:\n"
+            "- structure_fixes:\n\n"
+            "## Pass 3: Copy-editing Sweep\n"
+            "- awkward_sentences_removed:\n"
+            "- tone_alignment_fixes:\n"
+            "- final_polish:\n\n"
+            "## Final Decision\n"
+            "- iterations_completed: 0\n"
+            "- logic_pass: FAIL\n"
+            "- post_machine_qa_revision_completed: no\n"
+            "- final_decision: revise\n"
+            "- notes:\n"
         )
-
-    if filename == "qa_report.md":
-        qa_template = DEFAULT_DOCS_ROOT / "article_qa_checklist.md"
-        if qa_template.exists():
-            return qa_template.read_text(encoding="utf-8")
-        return "# qa_report.md\n\n"
 
     return f"# {filename}\n\n"
 
@@ -260,6 +310,11 @@ def create_workspace(
     workspace_root: Path,
     docs_root: Path,
     force: bool,
+    content_profile: str = "article",
+    source_url: str = "",
+    section_policy: str = "inherited",
+    section_labels: str = "",
+    subheading_length_target: str = "similar",
     planning_sprint_id: str = "",
     planning_topic_id: str = "",
     planning_row_status: str = "",
@@ -270,7 +325,10 @@ def create_workspace(
     workspace_dir = workspace_root / f"{date_str}_{slug}"
     workspace_dir.mkdir(parents=True, exist_ok=True)
 
-    brief_template = docs_root / "article_brief_template.md"
+    if content_profile == "service_page":
+        brief_template = docs_root / "service_page_brief_template.md"
+    else:
+        brief_template = docs_root / "article_brief_template.md"
     brief_path = workspace_dir / "article_brief.md"
     if brief_template.exists():
         brief_content = brief_template.read_text(encoding="utf-8")
@@ -278,11 +336,17 @@ def create_workspace(
         brief_content = "# article_brief.md\n\n"
     write_text(brief_path, brief_content, force=force)
 
-    for artifact in REQUIRED_ARTIFACTS:
+    for artifact in artifacts_for_profile(content_profile):
         artifact_path = workspace_dir / artifact
         if artifact == "article_brief.md":
             continue
-        content = template_for(artifact, topic=topic, company=company, today=date_str)
+        content = template_for(
+            artifact,
+            topic=topic,
+            company=company,
+            today=date_str,
+            content_profile=content_profile,
+        )
         write_text(artifact_path, content, force=force)
 
     run_context_path = workspace_dir / "run_context.md"
@@ -291,6 +355,11 @@ def create_workspace(
             "# run_context.md\n\n"
             f"- topic: {topic}\n"
             f"- company: {company}\n"
+            f"- content_profile: {content_profile}\n"
+            f"- source_url: {source_url}\n"
+            f"- section_policy: {section_policy}\n"
+            f"- section_labels: {section_labels}\n"
+            f"- subheading_length_target: {subheading_length_target}\n"
             f"- created_at: {dt.datetime.now().isoformat(timespec='seconds')}\n"
             "- workflow_version: v3.0\n"
             "- data_mode: external_only\n"
@@ -301,6 +370,10 @@ def create_workspace(
             "- research_fetch_started_at: \n"
             "- research_fetch_finished_at: \n"
             "- research_fetch_status: \n"
+            "- research_fallback_reason: \n"
+            "- research_confidence: \n"
+            "- company_profile_id: \n"
+            "- brand_voice_loaded: \n"
             f"- planning_sprint_id: {planning_sprint_id}\n"
             f"- planning_topic_id: {planning_topic_id}\n"
             f"- planning_row_status: {planning_row_status}\n"
@@ -312,6 +385,11 @@ def create_workspace(
             run_context_path,
             topic=topic,
             company=company,
+            content_profile=content_profile,
+            source_url=source_url,
+            section_policy=section_policy,
+            section_labels=section_labels,
+            subheading_length_target=subheading_length_target,
             planning_sprint_id=planning_sprint_id,
             planning_topic_id=planning_topic_id,
             planning_row_status=planning_row_status,
@@ -352,6 +430,23 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Overwrite existing artifact files if present.",
     )
+    parser.add_argument(
+        "--content-profile",
+        choices=["article", "service_page"],
+        default="article",
+        help="Output profile. article=long-form SEO article, service_page=service subpage content package.",
+    )
+    parser.add_argument(
+        "--source-url",
+        default="",
+        help="Source service page URL (required for content-profile=service_page).",
+    )
+    parser.add_argument(
+        "--section-policy",
+        choices=["inherited", "fixed"],
+        default="inherited",
+        help="How to resolve section labels for service page tabs.",
+    )
     parser.add_argument("--planning-sprint-id", default="", help="Planning sprint id from Workflow A.")
     parser.add_argument("--planning-topic-id", default="", help="Topic id from content planning backlog/queue.")
     parser.add_argument(
@@ -373,6 +468,9 @@ def main() -> int:
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", args.date):
         print("ERROR: --date must be in YYYY-MM-DD format.", file=sys.stderr)
         return 1
+    if args.content_profile == "service_page" and not args.source_url.strip():
+        print("ERROR: --source-url is required when --content-profile=service_page.", file=sys.stderr)
+        return 1
 
     workspace_dir = create_workspace(
         topic=args.topic.strip(),
@@ -381,6 +479,11 @@ def main() -> int:
         workspace_root=args.workspace_root.resolve(),
         docs_root=args.docs_root.resolve(),
         force=args.force,
+        content_profile=args.content_profile,
+        source_url=args.source_url.strip(),
+        section_policy=args.section_policy.strip(),
+        section_labels="",
+        subheading_length_target="similar",
         planning_sprint_id=args.planning_sprint_id.strip(),
         planning_topic_id=args.planning_topic_id.strip(),
         planning_row_status=args.planning_row_status.strip(),
@@ -389,7 +492,7 @@ def main() -> int:
 
     print(f"Workspace ready: {workspace_dir}")
     print("Artifacts:")
-    for name in REQUIRED_ARTIFACTS:
+    for name in artifacts_for_profile(args.content_profile):
         print(f"- {workspace_dir / name}")
     print(f"- {workspace_dir / 'run_context.md'}")
     return 0

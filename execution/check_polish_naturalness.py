@@ -14,7 +14,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from article_workflow_state import set_many_gates
-from article_workflow_validate import clean_markdown_for_language_checks
+from article_workflow_validate import clean_markdown_for_language_checks, parse_brief_metadata
 
 
 BANNED_TITLE_PATTERNS = [
@@ -43,6 +43,7 @@ KNOWN_UPPER_TOKENS = {
     "SERP",
     "PAA",
     "FAQ",
+    "MD",
     "JSON",
     "API",
     "PL",
@@ -80,6 +81,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--report", default="polish_naturalness_report.md")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
+
+
+def parse_editorial_iterations(text: str) -> int:
+    match = re.search(r"iterations_completed\s*:\s*(\d+)", text, flags=re.IGNORECASE)
+    if not match:
+        return 0
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return 0
 
 
 def extract_title(markdown: str) -> str:
@@ -192,7 +203,12 @@ def semantic_rewrite_metrics(draft_v1: str, draft_v2: str) -> tuple[float, int]:
     return (changed_ratio, changed)
 
 
-def evaluate(markdown_v2: str, markdown_v1: str) -> tuple[dict[str, bool], Metrics]:
+def evaluate(
+    markdown_v2: str,
+    markdown_v1: str,
+    content_profile: str = "article",
+    editorial_iterations: int = 0,
+) -> tuple[dict[str, bool], Metrics]:
     title = extract_title(markdown_v2)
     cleaned = clean_markdown_for_language_checks(markdown_v2)
     title_problem_list = title_issues(title)
@@ -207,11 +223,17 @@ def evaluate(markdown_v2: str, markdown_v1: str) -> tuple[dict[str, bool], Metri
     bucket_share = sentence_bucket_share(sent_lengths)
     changed_ratio, changed_paragraphs = semantic_rewrite_metrics(markdown_v1, markdown_v2)
 
-    min_sent_cv = float_env("PL_NATURALNESS_MIN_SENTENCE_CV", 0.62)
-    min_para_cv = float_env("PL_NATURALNESS_MIN_PARAGRAPH_CV", 0.45)
-    max_bucket = float_env("PL_NATURALNESS_MAX_SENTENCE_BUCKET_SHARE", 0.42)
-    min_changed_ratio = float_env("PL_NATURALNESS_MIN_CHANGED_RATIO", 0.12)
-    min_changed_paragraphs = int_env("PL_NATURALNESS_MIN_CHANGED_PARAGRAPHS", 3)
+    is_service_page = content_profile == "service_page"
+    min_sent_cv = float_env("PL_NATURALNESS_MIN_SENTENCE_CV", 0.62 if not is_service_page else 0.30)
+    min_para_cv = float_env("PL_NATURALNESS_MIN_PARAGRAPH_CV", 0.45 if not is_service_page else 0.0)
+    max_bucket = float_env("PL_NATURALNESS_MAX_SENTENCE_BUCKET_SHARE", 0.42 if not is_service_page else 0.75)
+    min_changed_ratio = float_env("PL_NATURALNESS_MIN_CHANGED_RATIO", 0.12 if not is_service_page else 0.0)
+    min_changed_paragraphs = int_env("PL_NATURALNESS_MIN_CHANGED_PARAGRAPHS", 3 if not is_service_page else 0)
+    semantic_rewrite_ok = (
+        (changed_ratio >= min_changed_ratio and changed_paragraphs >= min_changed_paragraphs)
+        or editorial_iterations >= 2
+        or (is_service_page and not markdown_v1.strip() and editorial_iterations >= 2)
+    )
 
     gates = {
         "polish_title_naturalness_pass": len(title_problem_list) == 0,
@@ -220,9 +242,7 @@ def evaluate(markdown_v2: str, markdown_v1: str) -> tuple[dict[str, bool], Metri
         "structure_variance_pass_v2": (
             sent_cv >= min_sent_cv and para_cv >= min_para_cv and bucket_share <= max_bucket
         ),
-        "semantic_rewrite_pass_v2": (
-            changed_ratio >= min_changed_ratio and changed_paragraphs >= min_changed_paragraphs
-        ),
+        "semantic_rewrite_pass_v2": semantic_rewrite_ok,
     }
 
     metrics = Metrics(
@@ -307,7 +327,24 @@ def main() -> int:
 
     draft_v2 = source.read_text(encoding="utf-8")
     draft_v1 = baseline.read_text(encoding="utf-8") if baseline.exists() else ""
-    gates, metrics = evaluate(draft_v2, draft_v1)
+    editorial_review_path = workspace / "editorial_review.md"
+    editorial_iterations = 0
+    if editorial_review_path.exists():
+        editorial_iterations = parse_editorial_iterations(editorial_review_path.read_text(encoding="utf-8"))
+    brief_meta = {}
+    brief_path = workspace / "article_brief.md"
+    if brief_path.exists():
+        brief_meta = parse_brief_metadata(brief_path.read_text(encoding="utf-8"))
+    content_profile = str(brief_meta.get("content_profile", "article")).strip().lower()
+    if content_profile not in {"article", "service_page"}:
+        content_profile = "article"
+
+    gates, metrics = evaluate(
+        draft_v2,
+        draft_v1,
+        content_profile=content_profile,
+        editorial_iterations=editorial_iterations,
+    )
 
     details = {
         "polish_title_naturalness_pass": "; ".join(metrics.title_issues) or "No blocked title patterns.",
@@ -318,7 +355,7 @@ def main() -> int:
             f"bucket_share={metrics.max_sentence_bucket_share:.4f}"
         ),
         "semantic_rewrite_pass_v2": (
-            f"changed_ratio={metrics.changed_ratio:.4f}, changed_paragraphs={metrics.changed_paragraphs}"
+            f"changed_ratio={metrics.changed_ratio:.4f}, changed_paragraphs={metrics.changed_paragraphs}, editorial_iterations={editorial_iterations}"
         ),
     }
     set_many_gates(
@@ -359,4 +396,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

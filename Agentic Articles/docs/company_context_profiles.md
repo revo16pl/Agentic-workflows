@@ -5,6 +5,13 @@ To jest pojedynczy plik konfiguracyjny dla wielu firm.
 Jedyna zmienna wybierana w promptcie to `company` (naturalna nazwa firmy).
 Brand voice jest zawsze przypisany do firmy i laduje sie automatycznie.
 
+## 1b. Machine-readable source (workflow runtime)
+- Runtime workflow korzysta z pliku:
+  - `Agentic Articles/docs/company_context_profiles.yaml`
+- Ten plik jest source-of-truth dla resolvera:
+  - `execution/company_profile_resolver.py`
+- `company_context_profiles.md` pozostaje dokumentacją opisową dla ludzi.
+
 ## 2. How to use
 1. W promptcie podajesz tylko firme naturalnie, np.:
 - "artykul dla studio balans"

@@ -1,4 +1,20 @@
-# SOP v2.1: SEO + Copywriting Workflow (Agentic Articles)
+# SOP v2.2: SEO + Copywriting Workflow (Agentic Articles)
+
+## Update v3.2 (Content Profiles: article + service_page)
+- Dodano profile tresci:
+  - `article` (long-form, workflow z RUN_QUEUE),
+  - `service_page` (URL-first, krotki pakiet tresci pod podstrone uslugowa).
+- Dodano URL bootstrap dla service pages:
+  - `python3 execution/prepare_service_page_from_url.py --url ... --company ...`
+- Dodano extractor kontekstu strony:
+  - `execution/extract_service_page_context.py` (Playwright first, curl fallback).
+- Dodano profile-aware walidacje:
+  - `python3 execution/article_workflow_validate.py --content-profile service_page`
+  - walidacja sekcji: `Subheading`, `Opis`, `Najważniejsze informacje`.
+- Dodano profile-aware export:
+  - `python3 execution/export_to_gdocs.py --content-profile service_page`.
+- Dodano lekki research pack dla `service_page`:
+  - mniejsze minima datasetu w `research_evidence_manifest.json` (`minimum_dataset`).
 
 ## Update v3.0 (Data-Driven Research Layer)
 - Dodano automatyczny etap `research_fetch` oparty o dane z:
@@ -10,6 +26,66 @@
 - Rozszerzono `research_evidence_manifest.json` do wersji `3.0` o:
   - `providers`, `query_seeds`, `keyword_metrics`, `serp_results`, `trend_points`, `competitor_matrix`.
 - Eksport do Google Docs zostaje zablokowany, jeśli `research_hard_block_pass != PASS`.
+
+## Update v3.3 (Service Page Quality Hardening)
+- Wprowadzono fallback research (`ok_with_fallback`) przy braku Google Ads:
+  - workflow nadal zbiera SERP/PAA/Suggest/Trends/competitor,
+  - w `run_context.md` zapisywane są: `research_fallback_reason`, `research_confidence`,
+  - w `research_evidence_manifest.json` zapisywane są: `providers_status`, `data_quality_note`.
+- Dodano machine-readable profile firmy:
+  - `Agentic Articles/docs/company_context_profiles.yaml`,
+  - resolver: `execution/company_profile_resolver.py`,
+  - snapshot w workspace: `company_profile_snapshot.json`.
+- Dla `service_page` draft nie jest prefillowany istniejącym copy z URL.
+- Dodano artefakt `service_page_writer_packet.md` jako obowiązkowy brief redakcyjny pod manualny draft.
+- Dodano artefakt `editorial_review.md` jako obowiązkowy zapis iteracji redakcyjnej dla `article` i `service_page`.
+- Dodano nowe service gates:
+  - `service_tab_content_nonempty_pass`,
+  - `service_faq_min_items_pass`,
+  - `service_no_placeholder_pass`,
+  - `service_brand_voice_alignment_pass`.
+- Dodano editorial QA gates:
+  - `service_editorial_review_exists`,
+  - `service_editorial_review_structure`,
+  - `service_editorial_review_complete`,
+  - `service_editorial_iterations_pass`,
+  - `service_editorial_logic_pass`,
+  - `service_editorial_final_decision`.
+- Eksport ma tryby:
+  - `--export-mode prod` (domyślny, blokuje wszystkie `--skip-*`),
+  - `--export-mode debug` (dozwolone skipy + warning `NOT_FOR_PUBLISH`).
+
+### Minimal Artifact Policy
+Po udanym eksporcie workflow sprząta pliki robocze i zostawia lokalnie tylko:
+- `article_research_pack.md`
+- `final_output.md`
+
+Pozostałe pliki są traktowane jako robocze / tymczasowe i mogą być usunięte po sukcesie.
+
+### Manual Draft Protocol (service_page)
+1. Uruchom `prepare_service_page_from_url.py` i potwierdź, że powstały:
+- `service_page_context.json`,
+- `company_profile_snapshot.json`,
+- `service_page_writer_packet.md`.
+2. Uruchom `research_fetch.py` i upewnij się, że:
+- `research_fetch_status` jest `ok` lub `ok_with_fallback`,
+- `article_research_pack.md` zawiera dane (bez pustych sekcji),
+- writer packet ma sekcję `Top research insights` uzupełnioną.
+3. Napisz ręcznie `article_draft_v2.md` na podstawie writer packet:
+- nowy subheading (bez kopiowania aktualnego leadu),
+- 3 akapity opisu,
+- komplet treści pod każdą zakładkę i min 2 pozycje FAQ.
+4. Wykonaj obowiązkowy editorial QA loop i uzupełnij `editorial_review.md`:
+- Pass 1: logika i sens zdań,
+- Pass 2: content-strategy (intent, odpowiedzi na pytania, kolejność sekcji),
+- Pass 3: copywriting (clarity, benefits, przeformułowanie pełnych fragmentów),
+- Pass 4: copy-editing (naturalność, rytm, usunięcie sztucznych konstrukcji).
+5. Zapisz minimum 2 iteracje i ustaw:
+- `logic_pass: PASS`
+- `post_machine_qa_revision_completed: yes` po finalnym krótkim passie po machine QA
+- `final_decision: approved`
+6. Przepuść pełne gate’y jakości (bez skipów).
+7. Eksportuj tylko przez `--export-mode prod`.
 
 ## Update v3.1 (Workflow A -> Workflow B Integration)
 - Dodano osobny Workflow A (bi-weekly content planning sprint) z artefaktami:
@@ -49,10 +125,8 @@ Wymagane pliki:
 2. `article_research_pack.md` (intent + SERP + facts + keywords + blueprint)
 3. `research_evidence_manifest.json` (source-of-truth dla danych research)
 4. `quality_gate.json` (source-of-truth dla machine gates)
-5. `article_draft_v1.md`
-6. `qa_report.md`
-7. `article_draft_v2.md`
-8. `publish_ready.md`
+5. `article_draft_v2.md`
+6. `editorial_review.md`
 
 ## 5. Research quality protocol (obowiazkowy)
 Agent moze uzyc tylko zrodel, ktore przejda ponizszy filtr:
@@ -165,7 +239,7 @@ Gate:
 - blueprint ma co najmniej 3 answer-first blocks.
 - blueprint ma min. 1 i max. 3 linki do stron uslug z profilu firmy.
 
-### Step 7: Draft v1
+### Step 7: Draft
 Dzialania:
 - napisz caly tekst wg blueprint,
 - trzymaj ton marki,
@@ -175,11 +249,30 @@ Dzialania:
 - linkuj tylko do uslug i stron z aktywnego profilu firmy.
 
 Output:
-- `article_draft_v1.md`.
+- `article_draft_v2.md` (jedyny roboczy draft tekstu)
 
 Gate:
 - 1200-2500 slow (domyslnie),
 - logiczny flow i zgodnosc z intent_map.
+
+### Step 7a: Editorial QA loop (obowiazkowy dla article i service_page)
+Dzialania:
+- agent czyta draft jak redaktor, nie jak walidator regexowy,
+- robi osobny pass na logike, sens, flow argumentu i naturalnosc polszczyzny,
+- poprawia cale fragmenty, a nie pojedyncze slowa,
+- stosuje kolejno perspektywy:
+  - `content-strategy`,
+  - `copywriting`,
+  - `copy-editing`,
+- zapisuje najwazniejsze poprawki i decyzje w `editorial_review.md`.
+
+Gate dla `service_page`:
+- `editorial_review.md` istnieje,
+- ma komplet sekcji review,
+- ma min. 2 iteracje,
+- `logic_pass = PASS`,
+- po machine QA agent robi jeszcze krotki pass wdrozeniowy i ustawia `post_machine_qa_revision_completed = yes`,
+- `final_decision = approved`.
 
 ### Step 7b: Polish language auto-fix (obowiazkowy)
 Dzialania:
@@ -251,18 +344,20 @@ Dzialania:
   - structured data consistency (jesli schema planowana),
   - company-profile alignment (uslugi, CTA, link range),
 - wypisz critical failures,
-- popraw tekst i stworz v2.
+- popraw tekst bez tworzenia kolejnych finalnych wersji pliku; pracujesz na jednym drafcie roboczym,
 - jesli gate nie przechodzi: wracaj do poprawki i powtarzaj Step 8 iteracyjnie (max 5 iteracji) do PASS.
+- przy problemach z sensem tekstu nie \"latasz\" pojedynczych fraz; przepisujesz akapit lub kolejnosc argumentu.
 
 Output:
-- `qa_report.md`,
-- `article_draft_v2.md`.
+- zaktualizowane `article_draft_v2.md`,
+- zaktualizowane `editorial_review.md`,
+- raporty machine QA jako pliki tymczasowe.
 
 Gate (hard):
 - total >= 85/100,
 - `critical_failures` = empty,
 - mandatory checks = PASS.
-- source of truth dla gate'ow: `quality_gate.json` (nie checkboxy w `qa_report.md`).
+- source of truth dla gate'ow: `quality_gate.json` + zatwierdzone `editorial_review.md`.
 - machine hard gates = PASS:
   - `polish_title_naturalness_pass`,
   - `polish_collocation_pass`,
@@ -280,23 +375,13 @@ Gate (hard):
   - `skills_policy_pass`,
   - `hard_block_export_pass`.
 
-### Step 9: Agent final QA package (ready for manual review)
-Dzialania:
-- agent konczy QA i oznacza paczke jako gotowa do finalnego review ownera w Google Docs,
-- status w `publish_ready.md` ustaw na `Ready_for_manual_review`,
-- `qa_report.md` final_decision ustaw na `approved` po przejsciu wszystkich gate'ow.
-
-Output:
-- `publish_ready.md` (Ready_for_manual_review/Approved/Revise).
-
-Gate:
-- tylko status `Ready_for_manual_review` (lub `Approved`) i QA `approved` pozwalaja przejsc do eksportu.
-
-### Step 10: Export final article to Google Docs
+### Step 9: Export final article to Google Docs
 Dzialania:
 - wyeksportuj `article_draft_v2.md` do Google Docs,
 - eksportuj jako rich text (naglowki/listy/linki), a nie surowy Markdown,
-- zapisz link i timestamp eksportu.
+- po sukcesie zapisz lokalny `final_output.md`,
+- wyczysc pliki robocze i zostaw tylko minimalny zestaw finalnych artefaktow,
+- link do Google Docs zwroc w odpowiedzi agenta zamiast zapisywac osobny plik z URL.
 
 Output:
 - komunikat terminalowy:
@@ -322,6 +407,8 @@ Gate:
     - dodaj co najmniej 2 konkretne elementy osadzenia: lokalny przyklad, ograniczenie tezy, praktyczna obserwacja,
     - nie ograniczaj redakcji do podmiany synonimow; przepisuj sens na poziomie calego fragmentu (2-3 zdania naraz),
     - kiedy to poprawia flow, zmieniaj kolejnosc argumentow/list (unikaj stalego schematu A-B-C).
+11. Jesli zdanie brzmi dziwnie po przeczytaniu na glos, traktuj to jako bug copy i przepisz je od zera.
+12. Nie uzywaj pseudo-obrazowych konstrukcji bez sensu logicznego (np. metafor, ktore nic nie wyjasniaja).
 
 ## 7b. Adaptive length policy (2026)
 1. Nie ma oficjalnego \"ideal word count\" od Google - dlugosc ma wynikać z pelnego pokrycia intencji.
@@ -355,13 +442,11 @@ Krytyczne fail conditions (dowolne = blokada):
 
 ## 9. Acceptance criteria (v1)
 Artykul jest "publish-ready" tylko gdy:
-1. Ma komplet artefaktow 1-6.
-2. QA >= 85/100.
-3. 0 critical failures.
-4. `qa_report.md` ma `final_decision: approved`.
-5. `publish_ready.md` ma status `Ready_for_manual_review` lub `Approved`.
-6. Artykul jest poprawnie wyeksportowany do Google Docs.
-7. `qa_iteration_feedback.md` (jesli powstal) jest zamkniety i wymagane poprawki sa wdrozone.
+1. Ma komplet minimalnych artefaktow roboczych potrzebnych do walidacji.
+2. Wszystkie hard gates w `quality_gate.json` sa na `PASS`.
+3. `editorial_review.md` ma `logic_pass: PASS`, `post_machine_qa_revision_completed: yes` i `final_decision: approved`.
+4. Artykul jest poprawnie wyeksportowany do Google Docs.
+5. Po eksporcie zostaja tylko `article_research_pack.md` i `final_output.md`.
 
 ## 10. Pilot walidacyjny (obowiazkowy)
 Cel: przetestowac workflow na realnym temacie lokalnym.

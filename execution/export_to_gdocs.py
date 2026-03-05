@@ -21,6 +21,29 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
 
+FINAL_OUTPUT_FILENAME = "final_output.md"
+TRANSIENT_ARTIFACTS = [
+    "article_brief.md",
+    "research_evidence_manifest.json",
+    "quality_gate.json",
+    "article_draft_v1.md",
+    "article_draft_v2.md",
+    "qa_report.md",
+    "publish_ready.md",
+    "editorial_review.md",
+    "run_context.md",
+    "service_page_context.json",
+    "company_profile_snapshot.json",
+    "service_page_writer_packet.md",
+    "qa_iteration_feedback.md",
+    "language_quality_report.md",
+    "polish_naturalness_report.md",
+    "polish_fluency_ml_report.md",
+    "humanization_report.md",
+    "workflow_context_report.md",
+    "research_quality_report.md",
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export article draft to Google Docs.")
@@ -31,6 +54,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--owner", default=None, help="Owner name for metadata (optional).")
     parser.add_argument("--company", default=None, help="Override company metadata (optional).")
     parser.add_argument("--topic", default=None, help="Override topic metadata (optional).")
+    parser.add_argument(
+        "--content-profile",
+        choices=["article", "service_page"],
+        default="article",
+        help="Output profile that controls validation gates and metadata defaults.",
+    )
+    parser.add_argument(
+        "--export-mode",
+        choices=["prod", "debug"],
+        default="prod",
+        help="prod blocks all skip-* bypasses; debug allows them with NOT_FOR_PUBLISH warning.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Resolve metadata without API call.")
     parser.add_argument(
         "--skip-validation",
@@ -66,6 +101,11 @@ def parse_args() -> argparse.Namespace:
         "--skip-research-check",
         action="store_true",
         help="Skip research quality gate check before validation.",
+    )
+    parser.add_argument(
+        "--keep-workfiles",
+        action="store_true",
+        help="Keep temporary workflow files after successful export. Default is cleanup to minimal final artifacts.",
     )
     return parser.parse_args()
 
@@ -365,11 +405,42 @@ def move_doc_to_folder(drive_service, file_id: str, folder_id: str) -> None:
     ).execute()
 
 
+def finalize_workspace_artifacts(
+    *,
+    workspace: Path,
+    source_path: Path,
+    doc_url: str,
+    keep_workfiles: bool,
+) -> Path:
+    final_output_path = workspace / FINAL_OUTPUT_FILENAME
+    source_text = source_path.read_text(encoding="utf-8")
+    final_output_path.write_text(source_text, encoding="utf-8")
+
+    if keep_workfiles:
+        return final_output_path
+
+    for artifact in TRANSIENT_ARTIFACTS:
+        path = workspace / artifact
+        if path == final_output_path:
+            continue
+        if path.exists():
+            path.unlink()
+
+    cache_dir = workspace / ".cache"
+    if cache_dir.exists() and cache_dir.is_dir():
+        for child in sorted(cache_dir.rglob("*"), reverse=True):
+            if child.is_file():
+                child.unlink()
+            elif child.is_dir():
+                child.rmdir()
+        cache_dir.rmdir()
+
+    return final_output_path
+
+
 def write_iteration_feedback(workspace: Path, errors: list[str]) -> Path:
     suggestions = []
     error_map = {
-        "qa final_decision must be approved": "Ustaw `final_decision: approved` dopiero po poprawkach i ponownym QA.",
-        "publish_ready.md must be ready_for_manual_review or approved": "Ustaw w `publish_ready.md` status `Ready_for_manual_review` po przejsciu gate'ow.",
         "word count": "Dopasuj dlugosc `article_draft_v2.md` do zakresu `word_count_min`/`word_count_max` w briefie.",
         "human_quality_pass": "Uzupelnij i ustaw `human_quality_pass: PASS` po redakcji anty-slop.",
         "keyword_coverage_pass": "Uzupelnij i ustaw `keyword_coverage_pass: PASS` po sprawdzeniu pokrycia klastra.",
@@ -448,7 +519,7 @@ def write_iteration_feedback(workspace: Path, errors: list[str]) -> Path:
     ]
     lines.extend([f"- {error}" for error in errors] or ["- (no errors captured)"])
     lines.extend(["", "## Suggested actions"])
-    lines.extend([f"- {item}" for item in unique_suggestions] or ["- Przejrzyj qa_report.md i popraw wskazane obszary."])
+    lines.extend([f"- {item}" for item in unique_suggestions] or ["- Przejrzyj `editorial_review.md`, popraw draft i uruchom walidację ponownie."])
 
     if blocked_for_limit:
         lines.extend(
@@ -640,6 +711,25 @@ def main() -> int:
         print(f"ERROR: Source file not found: {source_path}", file=sys.stderr)
         return 1
 
+    skip_used = any(
+        [
+            args.skip_validation,
+            args.skip_language_fix,
+            args.skip_humanization_check,
+            args.skip_naturalness_check,
+            args.skip_fluency_ml_check,
+            args.skip_context_check,
+            args.skip_research_check,
+        ]
+    )
+    if args.export_mode == "prod" and skip_used:
+        print(
+            "ERROR: --skip-* options are blocked in export-mode=prod. "
+            "Use full gates or switch to --export-mode debug.",
+            file=sys.stderr,
+        )
+        return 1
+
     if not args.skip_language_fix:
         language_ok, language_details = run_polish_language_pass(
             workspace=workspace,
@@ -742,36 +832,68 @@ def main() -> int:
             print(f"Feedback file created: {feedback_path}", file=sys.stderr)
             return 1
 
-    hard_gate_order = [
-        "polish_title_naturalness_pass",
-        "polish_collocation_pass",
-        "polish_grammar_pass",
-        "polish_diacritics_pass",
-        "polish_punctuation_pass",
-        "polish_fluency_ml_pass",
-        "structure_variance_pass_v2",
-        "semantic_rewrite_pass_v2",
-        "forbidden_phrase_pass",
-        "specificity_pass",
-        "voice_authenticity_pass",
-        "rewrite_loop_pass",
-        "evidence_provenance_pass",
-        "skills_policy_pass",
-        "keyword_metrics_coverage_pass",
-        "serp_dataset_quality_pass",
-        "trends_dataset_quality_pass",
-        "competitor_matrix_pass",
-        "research_data_freshness_pass",
-        "research_hard_block_pass",
-        "topic_from_approved_plan_pass",
-        "hard_block_export_pass",
-    ]
+    context_meta = parse_run_context(workspace / "run_context.md")
+    effective_content_profile = args.content_profile
+    context_profile = context_meta.get("content_profile", "").strip().lower()
+    if effective_content_profile == "article" and context_profile == "service_page":
+        effective_content_profile = "service_page"
+
+    hard_gate_order = (
+        [
+            "polish_title_naturalness_pass",
+            "polish_collocation_pass",
+            "polish_grammar_pass",
+            "polish_diacritics_pass",
+            "polish_punctuation_pass",
+            "polish_fluency_ml_pass",
+            "structure_variance_pass_v2",
+            "semantic_rewrite_pass_v2",
+            "forbidden_phrase_pass",
+            "specificity_pass",
+            "voice_authenticity_pass",
+            "rewrite_loop_pass",
+            "evidence_provenance_pass",
+            "skills_policy_pass",
+            "keyword_metrics_coverage_pass",
+            "serp_dataset_quality_pass",
+            "trends_dataset_quality_pass",
+            "competitor_matrix_pass",
+            "research_data_freshness_pass",
+            "research_hard_block_pass",
+            "topic_from_approved_plan_pass",
+            "hard_block_export_pass",
+        ]
+        if effective_content_profile == "article"
+        else [
+            "polish_title_naturalness_pass",
+            "polish_collocation_pass",
+            "polish_grammar_pass",
+            "polish_diacritics_pass",
+            "polish_punctuation_pass",
+            "polish_fluency_ml_pass",
+            "structure_variance_pass_v2",
+            "semantic_rewrite_pass_v2",
+            "forbidden_phrase_pass",
+            "specificity_pass",
+            "voice_authenticity_pass",
+            "rewrite_loop_pass",
+            "evidence_provenance_pass",
+            "skills_policy_pass",
+            "keyword_metrics_coverage_pass",
+            "serp_dataset_quality_pass",
+            "trends_dataset_quality_pass",
+            "competitor_matrix_pass",
+            "research_data_freshness_pass",
+            "research_hard_block_pass",
+            "hard_block_export_pass",
+        ]
+    )
     set_hard_gate_set(workspace=workspace, hard_gate_names=hard_gate_order)
     recompute_hard_block_gate(workspace=workspace)
 
     if not args.skip_validation:
         recompute_hard_block_gate(workspace=workspace)
-        precheck = validate_workspace(workspace=workspace, mode="pre_export")
+        precheck = validate_workspace(workspace=workspace, mode="pre_export", content_profile=effective_content_profile)
         if not precheck.ok:
             print("ERROR: Pre-export validation failed. Fix issues before Google Docs export.", file=sys.stderr)
             for error in precheck.errors:
@@ -781,7 +903,6 @@ def main() -> int:
             return 1
 
     brief_meta = parse_brief_metadata(workspace / "article_brief.md")
-    context_meta = parse_run_context(workspace / "run_context.md")
     company = args.company or brief_meta.get("company") or context_meta.get("company") or "unknown-company"
     topic = args.topic or brief_meta.get("topic") or context_meta.get("topic") or source_path.stem
     owner = args.owner or brief_meta.get("owner") or os.getenv("USER", "unknown")
@@ -793,6 +914,10 @@ def main() -> int:
 
     if args.dry_run:
         print("Dry run enabled. No API call made.")
+        print(f"- export_mode: {args.export_mode}")
+        if args.export_mode == "debug":
+            print("- warning: NOT_FOR_PUBLISH")
+        print(f"- content_profile: {effective_content_profile}")
         print(f"- title: {title}")
         print(f"- company: {company}")
         print(f"- topic: {topic}")
@@ -823,8 +948,17 @@ def main() -> int:
         move_doc_to_folder(drive_service=drive_service, file_id=doc_id, folder_id=folder_id)
 
     doc_url = f"https://docs.google.com/document/d/{doc_id}/edit"
-    print(f"ARTYKUL GOTOWY: {doc_url}")
-    print("Status: gotowy do manual review w Google Docs.")
+    final_output_path = finalize_workspace_artifacts(
+        workspace=workspace,
+        source_path=source_path,
+        doc_url=doc_url,
+        keep_workfiles=args.keep_workfiles,
+    )
+    print(f"DOKUMENT GOTOWY: {doc_url}")
+    if args.export_mode == "debug":
+        print("WARNING: NOT_FOR_PUBLISH (export-mode=debug)")
+    print(f"Final local output: {final_output_path}")
+    print(f"Status: gotowy do manual review w Google Docs ({effective_content_profile}).")
     return 0
 
 

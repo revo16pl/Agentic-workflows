@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "profiles": [
+    {
+      "profile_id": "studio_balans",
+      "company": "studio balans",
+      "aliases": [
+        "studio balans",
+        "studiobalans",
+        "balans",
+        "studio masazu",
+        "studio masażu",
+        "studio balansu"
+      ],
+      "website_domain": "studiobalans.pl",
+      "business_type": "salon masazu, kosmetologii i treningu",
+      "primary_locations": [
+        "Niepolomice",
+        "Wieliczka",
+        "Krakow"
+      ],
+      "brand_voice": {
+        "name": "kolezanka ekspertka",
+        "narrator": "kobieta do kobiety, doradczyni",
+        "tone_rules": [
+          "przyjaznie, konkretnie, szczerze",
+          "mow w 2. osobie i dawaj praktyczne kroki",
+          "empatia bez lukru, bez pustych obietnic"
+        ],
+        "avoid_rules": [
+          "moralizowanie i zawstydzanie",
+          "agresywna sprzedaz",
+          "obietnice efektu po 1 zabiegu"
+        ],
+        "requires_second_person": true,
+        "second_person_min_hits": 2
+      },
+      "default_cta": {
+        "tofu": "Sprawdz, ktora metoda bedzie dla Ciebie najbezpieczniejsza i najskuteczniejsza.",
+        "mofu": "Umow konsultacje i dobierz plan EMS + regeneracja.",
+        "bofu": "Zarezerwuj pierwsza wizyte online."
+      },
+      "services": [
+        {
+          "service_name": "Trening EMS",
+          "service_url": "https://studiobalans.pl/uslugi/trening-ems",
+          "target_use_cases": [
+            "redukcja tkanki tluszczowej",
+            "wzmocnienie po dlugiej przerwie",
+            "powrot do formy"
+          ]
+        },
+        {
+          "service_name": "Masaz terapeutyczny",
+          "service_url": "https://studiobalans.pl/uslugi/masaz-terapeutyczny",
+          "target_use_cases": [
+            "napiecie karku",
+            "bol plecow",
+            "regeneracja"
+          ]
+        },
+        {
+          "service_name": "Kosmetologia",
+          "service_url": "https://studiobalans.pl/uslugi/kosmetologia",
+          "target_use_cases": [
+            "pielegnacja skory",
+            "terapie zabiegowe",
+            "plan pielegnacyjny"
+          ]
+        }
+      ],
+      "allowed_service_links": [
+        "https://studiobalans.pl/uslugi/trening-ems",
+        "https://studiobalans.pl/uslugi/masaz-terapeutyczny",
+        "https://studiobalans.pl/uslugi/kosmetologia",
+        "https://studiobalans.pl/rezerwacja",
+        "https://studiobalans.pl/kontakt"
+      ],
+      "excluded_topics_or_claims": [
+        "medyczne diagnozy bez uprawnien"
+      ],
+      "legal_compliance_notes": [
+        "nie uzywac twierdzen medycznych bez podstaw",
+        "przy efektach estetycznych podawac, ze efekty sa indywidualne"
+      ]
+    }
+  ]
+}

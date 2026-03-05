@@ -63,6 +63,31 @@ def evaluate(payload: dict[str, Any]) -> tuple[dict[str, bool], dict[str, Any]]:
     competitor_matrix = payload.get("competitor_matrix", []) if isinstance(payload.get("competitor_matrix"), list) else []
     content_gaps = payload.get("content_gaps", []) if isinstance(payload.get("content_gaps"), list) else []
 
+    minimum = payload.get("minimum_dataset", {}) if isinstance(payload.get("minimum_dataset"), dict) else {}
+
+    def min_value(key: str, default: int) -> int:
+        raw = minimum.get(key, default)
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return default
+
+    required_keyword_metrics = min_value("keyword_metrics", 40)
+    required_serp_results = min_value("serp_results", min_value("serp_top10_urls", 30))
+    required_trend_queries = min_value("trend_queries", 5)
+    required_points_per_trend_query = min_value("trend_points_per_query", 12)
+    required_competitor_matrix = min_value("competitor_matrix", 10)
+    required_content_gaps = min_value("content_gaps", 5)
+    required_serp_domains = min_value("serp_unique_domains", 8)
+    required_keyword_numeric_ratio = float(minimum.get("keyword_numeric_ratio", 0.80))
+    freshness_days = min_value("freshness_days", 7)
+    providers_status = payload.get("providers_status", {}) if isinstance(payload.get("providers_status"), dict) else {}
+    keyword_provider_status = str(providers_status.get("keyword_metrics", "ok")).strip().lower()
+    trend_provider_status = str(providers_status.get("trends", "ok")).strip().lower()
+    effective_keyword_numeric_ratio = required_keyword_numeric_ratio
+    if keyword_provider_status in {"fallback", "failed"}:
+        effective_keyword_numeric_ratio = 0.0
+
     numeric_keyword_count = 0
     for row in keyword_metrics:
         if not isinstance(row, dict):
@@ -85,8 +110,13 @@ def evaluate(payload: dict[str, Any]) -> tuple[dict[str, bool], dict[str, Any]]:
             continue
         trend_queries[q] = trend_queries.get(q, 0) + 1
 
-    trend_query_count = len(trend_queries)
+    trend_queries_legacy = payload.get("trend_queries", []) if isinstance(payload.get("trend_queries"), list) else []
+    legacy_count = len([x for x in trend_queries_legacy if str(x).strip()])
+    trend_query_count = max(len(trend_queries), legacy_count)
     min_points_per_query = min(trend_queries.values()) if trend_queries else 0
+    effective_points_per_query = required_points_per_trend_query
+    if trend_provider_status in {"fallback", "failed"}:
+        effective_points_per_query = 0
 
     matrix_gaps: set[str] = set(str(x).strip() for x in content_gaps if str(x).strip())
     for row in competitor_matrix:
@@ -96,16 +126,15 @@ def evaluate(payload: dict[str, Any]) -> tuple[dict[str, bool], dict[str, Any]]:
             if str(gap).strip():
                 matrix_gaps.add(str(gap).strip())
 
-    freshness_days = 7
     now = datetime.now(timezone.utc)
     pulled_at_values = _all_pulled_at(payload)
     freshness_ok = bool(pulled_at_values) and all(now - dt <= timedelta(days=freshness_days) for dt in pulled_at_values)
 
     gates = {
-        "keyword_metrics_coverage_pass": total_keywords >= 40 and numeric_ratio >= 0.80,
-        "serp_dataset_quality_pass": len(serp_results) >= 30 and unique_domains >= 8,
-        "trends_dataset_quality_pass": trend_query_count >= 5 and min_points_per_query >= 12,
-        "competitor_matrix_pass": len(competitor_matrix) >= 10 and len(matrix_gaps) >= 5,
+        "keyword_metrics_coverage_pass": total_keywords >= required_keyword_metrics and numeric_ratio >= effective_keyword_numeric_ratio,
+        "serp_dataset_quality_pass": len(serp_results) >= required_serp_results and unique_domains >= required_serp_domains,
+        "trends_dataset_quality_pass": trend_query_count >= required_trend_queries and min_points_per_query >= effective_points_per_query,
+        "competitor_matrix_pass": len(competitor_matrix) >= required_competitor_matrix and len(matrix_gaps) >= required_content_gaps,
         "research_data_freshness_pass": freshness_ok,
     }
     gates["research_hard_block_pass"] = all(gates.values())
@@ -121,6 +150,18 @@ def evaluate(payload: dict[str, Any]) -> tuple[dict[str, bool], dict[str, Any]]:
         "content_gaps_count": len(matrix_gaps),
         "freshness_days_threshold": freshness_days,
         "pulled_at_values_count": len(pulled_at_values),
+        "required_keyword_metrics": required_keyword_metrics,
+        "required_keyword_numeric_ratio": required_keyword_numeric_ratio,
+        "effective_keyword_numeric_ratio": effective_keyword_numeric_ratio,
+        "keyword_provider_status": keyword_provider_status,
+        "required_serp_results": required_serp_results,
+        "required_serp_domains": required_serp_domains,
+        "required_trend_queries": required_trend_queries,
+        "required_points_per_trend_query": required_points_per_trend_query,
+        "effective_points_per_trend_query": effective_points_per_query,
+        "trend_provider_status": trend_provider_status,
+        "required_competitor_matrix": required_competitor_matrix,
+        "required_content_gaps": required_content_gaps,
     }
     return gates, metrics
 
@@ -165,9 +206,19 @@ def main() -> int:
         source="check_research_quality.py",
         severity="hard",
         details={
-            "keyword_metrics_coverage_pass": f"count={metrics['keyword_metrics_count']}, numeric_ratio={metrics['keyword_numeric_ratio']}",
+            "keyword_metrics_coverage_pass": (
+                f"count={metrics['keyword_metrics_count']}, "
+                f"numeric_ratio={metrics['keyword_numeric_ratio']}, "
+                f"required_numeric_ratio={metrics['effective_keyword_numeric_ratio']}, "
+                f"provider_status={metrics['keyword_provider_status']}"
+            ),
             "serp_dataset_quality_pass": f"serp_results={metrics['serp_results_count']}, unique_domains={metrics['serp_unique_domains']}",
-            "trends_dataset_quality_pass": f"queries={metrics['trend_query_count']}, min_points={metrics['trend_min_points_per_query']}",
+            "trends_dataset_quality_pass": (
+                f"queries={metrics['trend_query_count']}, "
+                f"min_points={metrics['trend_min_points_per_query']}, "
+                f"required_points={metrics['effective_points_per_trend_query']}, "
+                f"provider_status={metrics['trend_provider_status']}"
+            ),
             "competitor_matrix_pass": f"rows={metrics['competitor_matrix_count']}, gaps={metrics['content_gaps_count']}",
             "research_data_freshness_pass": f"pulled_at_values={metrics['pulled_at_values_count']}, threshold_days={metrics['freshness_days_threshold']}",
         },

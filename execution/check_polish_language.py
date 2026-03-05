@@ -373,27 +373,6 @@ def write_report(
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def update_qa_gates(workspace: Path, diacritics_pass: bool, grammar_pass: bool) -> None:
-    qa_path = workspace / "qa_report.md"
-    if not qa_path.exists():
-        return
-
-    text = qa_path.read_text(encoding="utf-8")
-    gates = {
-        "polish_diacritics_pass": "PASS" if diacritics_pass else "FAIL",
-        "polish_grammar_pass": "PASS" if grammar_pass else "FAIL",
-    }
-
-    for gate, status in gates.items():
-        pattern = rf"(^-\s*{re.escape(gate)}\s*:\s*)(PASS|FAIL)"
-        if re.search(pattern, text, flags=re.M):
-            text = re.sub(pattern, rf"\1{status}", text, flags=re.M)
-        else:
-            text += f"\n- {gate}: {status}"
-
-    qa_path.write_text(text, encoding="utf-8")
-
-
 def update_quality_gate(
     workspace: Path,
     *,
@@ -516,11 +495,6 @@ def main() -> int:
             grammar_pass=grammar_pass,
             overall_pass=overall_pass,
             samples=samples_after or samples_before,
-        )
-        update_qa_gates(
-            workspace=workspace,
-            diacritics_pass=diacritics_pass,
-            grammar_pass=grammar_pass,
         )
         update_quality_gate(
             workspace=workspace,

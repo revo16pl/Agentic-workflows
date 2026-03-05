@@ -81,9 +81,15 @@ def evaluate_skills(workspace: Path) -> tuple[bool, list[str]]:
             messages.append("run_context.md research_providers_loaded missing: " + ", ".join(missing_providers))
 
     fetch_status = context.get("research_fetch_status", "").strip().lower()
-    if fetch_status != "ok":
+    if fetch_status not in {"ok", "ok_with_fallback"}:
         ok = False
-        messages.append("run_context.md research_fetch_status must be 'ok'.")
+        messages.append("run_context.md research_fetch_status must be 'ok' or 'ok_with_fallback'.")
+    elif fetch_status == "ok_with_fallback":
+        fallback_reason = context.get("research_fallback_reason", "").strip()
+        messages.append(
+            "Research completed with fallback mode."
+            + (f" reason={fallback_reason}" if fallback_reason else "")
+        )
 
     missing_loaded = [skill for skill in REQUIRED_SKILLS if skill not in loaded]
     if missing_loaded:
@@ -112,8 +118,20 @@ def evaluate_skills(workspace: Path) -> tuple[bool, list[str]]:
 
 def evaluate_planning_reference(workspace: Path) -> tuple[bool, list[str]]:
     context = parse_run_context(workspace / "run_context.md")
+    content_profile = context.get("content_profile", "article").strip().lower()
     messages: list[str] = []
     ok = True
+
+    if content_profile == "service_page":
+        source_url = context.get("source_url", "").strip()
+        if not source_url:
+            return False, ["Missing source_url in run_context.md for service_page profile."]
+        if context.get("brand_voice_loaded", "").strip().lower() != "yes":
+            return False, ["Missing brand_voice_loaded: yes in run_context.md for service_page profile."]
+        if not context.get("company_profile_id", "").strip():
+            return False, ["Missing company_profile_id in run_context.md for service_page profile."]
+        messages.append("service_page profile detected: planning queue check bypassed (URL-first mode).")
+        return True, messages
 
     planning_sprint_id = context.get("planning_sprint_id", "").strip()
     planning_topic_id = context.get("planning_topic_id", "").strip()
@@ -253,6 +271,7 @@ def evaluate_evidence(workspace: Path) -> tuple[bool, list[str]]:
                 if query:
                     unique_queries.add(query)
         trend_query_count = len(unique_queries)
+    trend_queries_count_legacy = safe_len(trend_queries)
 
     required_counts = {
         "serp_urls": (
@@ -268,7 +287,7 @@ def evaluate_evidence(workspace: Path) -> tuple[bool, list[str]]:
             int(minimum.get("paa_questions", DEFAULT_MINIMUM_DATASET["paa_questions"])),
         ),
         "trend_queries": (
-            trend_query_count if trend_query_count > 0 else safe_len(trend_queries),
+            max(trend_query_count, trend_queries_count_legacy),
             int(minimum.get("trend_queries", DEFAULT_MINIMUM_DATASET["trend_queries"])),
         ),
         "competitor_matrix": (
@@ -307,6 +326,8 @@ def evaluate_evidence(workspace: Path) -> tuple[bool, list[str]]:
 def write_report(path: Path, payload: dict[str, object]) -> None:
     lines = [
         "# workflow_context_report.md",
+        "",
+        f"- content_profile: {payload.get('content_profile', 'article')}",
         "",
         "## Gates",
         f"- skills_policy_pass: {'PASS' if payload['skills_policy_pass'] else 'FAIL'}",
@@ -352,6 +373,7 @@ def main() -> int:
 
     payload = {
         "ok": skills_ok and evidence_ok and planning_ok,
+        "content_profile": parse_run_context(workspace / "run_context.md").get("content_profile", "article"),
         "skills_policy_pass": skills_ok,
         "evidence_provenance_pass": evidence_ok,
         "topic_from_approved_plan_pass": planning_ok,

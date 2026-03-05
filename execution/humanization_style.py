@@ -148,6 +148,24 @@ def service_marker_hits(text_norm: str) -> int:
     return sum(len(re.findall(rf"(?<!\w){re.escape(x)}(?!\w)", text_norm)) for x in SERVICE_MARKERS)
 
 
+def profile_threshold(
+    brief: dict[str, str],
+    *,
+    env_name: str,
+    article_default: float,
+    service_default: float,
+) -> float:
+    raw = os.getenv(env_name)
+    if raw is not None:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+
+    profile = str(brief.get("content_profile", "article")).strip().lower()
+    return service_default if profile == "service_page" else article_default
+
+
 def style_checks(md: str, brief: dict[str, str]) -> dict[str, object]:
     cleaned = clean_markdown_for_language_checks(md)
     text_norm = norm(cleaned)
@@ -171,7 +189,7 @@ def style_checks(md: str, brief: dict[str, str]) -> dict[str, object]:
     para_cv = (std([float(x) for x in paragraph_lengths]) / para_mean) if para_mean else 0.0
     short_para_share = 0.0
     if paragraph_lengths:
-        limit = int(os.getenv("HUMAN_SHORT_PARAGRAPH_WORDS", "35"))
+        limit = int(profile_threshold(brief, env_name="HUMAN_SHORT_PARAGRAPH_WORDS", article_default=35, service_default=12))
         short_para_share = sum(1 for x in paragraph_lengths if x < limit) / len(paragraph_lengths)
 
     opening_list = paragraph_openings(md)
@@ -214,39 +232,39 @@ def style_checks(md: str, brief: dict[str, str]) -> dict[str, object]:
     need_second = ("studio balans" in company) or ("balans" in company)
 
     specificity_points = 0
-    if digits_count >= int(os.getenv("HUMAN_MIN_DIGITS", "4")):
+    if digits_count >= int(profile_threshold(brief, env_name="HUMAN_MIN_DIGITS", article_default=4, service_default=1)):
         specificity_points += 1
-    if numeric_context_count >= int(os.getenv("HUMAN_MIN_NUMERIC_CONTEXTS", "2")):
+    if numeric_context_count >= int(profile_threshold(brief, env_name="HUMAN_MIN_NUMERIC_CONTEXTS", article_default=2, service_default=1)):
         specificity_points += 1
-    if examples_count >= int(os.getenv("HUMAN_MIN_EXAMPLE_MARKERS", "2")):
+    if examples_count >= int(profile_threshold(brief, env_name="HUMAN_MIN_EXAMPLE_MARKERS", article_default=2, service_default=1)):
         specificity_points += 1
-    if links_count >= int(os.getenv("HUMAN_MIN_LINKS", "2")):
+    if links_count >= int(profile_threshold(brief, env_name="HUMAN_MIN_LINKS", article_default=2, service_default=0)):
         specificity_points += 1
-    if service_hits >= int(os.getenv("HUMAN_MIN_SERVICE_MARKER_HITS", "3")):
+    if service_hits >= int(profile_threshold(brief, env_name="HUMAN_MIN_SERVICE_MARKER_HITS", article_default=3, service_default=2)):
         specificity_points += 1
-    if (not need_local) or local_hits >= int(os.getenv("HUMAN_MIN_LOCAL_HITS", "2")):
+    if (not need_local) or local_hits >= int(profile_threshold(brief, env_name="HUMAN_MIN_LOCAL_HITS", article_default=2, service_default=1)):
         specificity_points += 1
 
     gates = {
         "forbidden_phrase_pass": forbidden_total <= int(os.getenv("HUMAN_MAX_FORBIDDEN_HITS", "0")),
         "structure_variance_pass": (
-            sent_cv >= float(os.getenv("HUMAN_MIN_SENTENCE_CV", "0.48"))
-            and sentence_uniform_share <= float(os.getenv("HUMAN_MAX_SENTENCE_UNIFORM_SHARE", "0.62"))
-            and para_cv >= float(os.getenv("HUMAN_MIN_PARAGRAPH_CV", "0.34"))
-            and opening_repeat_share <= float(os.getenv("HUMAN_MAX_PARAGRAPH_OPENING_REPEAT_SHARE", "0.28"))
-            and sentence_opening_repeat_share <= float(os.getenv("HUMAN_MAX_SENTENCE_OPENING_REPEAT_SHARE", "0.18"))
-            and sentence_opening_max_run <= int(os.getenv("HUMAN_MAX_SENTENCE_OPENING_RUN", "2"))
-            and filler_density <= float(os.getenv("HUMAN_MAX_FILLER_PER_1000", "6.0"))
-            and triad_density <= float(os.getenv("HUMAN_MAX_TRIADS_PER_1000", "3.0"))
+            sent_cv >= profile_threshold(brief, env_name="HUMAN_MIN_SENTENCE_CV", article_default=0.48, service_default=0.22)
+            and sentence_uniform_share <= profile_threshold(brief, env_name="HUMAN_MAX_SENTENCE_UNIFORM_SHARE", article_default=0.62, service_default=0.88)
+            and para_cv >= profile_threshold(brief, env_name="HUMAN_MIN_PARAGRAPH_CV", article_default=0.34, service_default=0.0)
+            and opening_repeat_share <= profile_threshold(brief, env_name="HUMAN_MAX_PARAGRAPH_OPENING_REPEAT_SHARE", article_default=0.28, service_default=0.65)
+            and sentence_opening_repeat_share <= profile_threshold(brief, env_name="HUMAN_MAX_SENTENCE_OPENING_REPEAT_SHARE", article_default=0.18, service_default=0.6)
+            and sentence_opening_max_run <= int(profile_threshold(brief, env_name="HUMAN_MAX_SENTENCE_OPENING_RUN", article_default=2, service_default=4))
+            and filler_density <= profile_threshold(brief, env_name="HUMAN_MAX_FILLER_PER_1000", article_default=6.0, service_default=12.0)
+            and triad_density <= profile_threshold(brief, env_name="HUMAN_MAX_TRIADS_PER_1000", article_default=3.0, service_default=7.0)
         ),
-        "specificity_pass": specificity_points >= int(os.getenv("HUMAN_MIN_SPECIFICITY_POINTS", "5")),
+        "specificity_pass": specificity_points >= int(profile_threshold(brief, env_name="HUMAN_MIN_SPECIFICITY_POINTS", article_default=5, service_default=3)),
         "voice_authenticity_pass": (
-            jargon_density <= float(os.getenv("HUMAN_MAX_JARGON_PER_1000", "5.0"))
-            and nominalization_density <= float(os.getenv("HUMAN_MAX_NOMINALIZATIONS_PER_1000", "14.0"))
-            and generic_lead_hits <= int(os.getenv("HUMAN_MAX_GENERIC_LEAD_HITS", "0"))
-            and short_para_share <= float(os.getenv("HUMAN_MAX_SHORT_PARAGRAPH_SHARE", "0.55"))
-            and ((not need_second) or second_person_hits >= int(os.getenv("HUMAN_MIN_SECOND_PERSON_HITS", "6")))
-            and ((not need_second) or question_marks >= int(os.getenv("HUMAN_MIN_QUESTIONS_FOR_CONVERSATIONAL_VOICE", "2")))
+            jargon_density <= profile_threshold(brief, env_name="HUMAN_MAX_JARGON_PER_1000", article_default=5.0, service_default=10.0)
+            and nominalization_density <= profile_threshold(brief, env_name="HUMAN_MAX_NOMINALIZATIONS_PER_1000", article_default=14.0, service_default=20.0)
+            and generic_lead_hits <= int(profile_threshold(brief, env_name="HUMAN_MAX_GENERIC_LEAD_HITS", article_default=0, service_default=1))
+            and short_para_share <= profile_threshold(brief, env_name="HUMAN_MAX_SHORT_PARAGRAPH_SHARE", article_default=0.55, service_default=1.0)
+            and ((not need_second) or second_person_hits >= int(profile_threshold(brief, env_name="HUMAN_MIN_SECOND_PERSON_HITS", article_default=6, service_default=2)))
+            and ((not need_second) or question_marks >= int(profile_threshold(brief, env_name="HUMAN_MIN_QUESTIONS_FOR_CONVERSATIONAL_VOICE", article_default=2, service_default=0)))
         ),
     }
 
@@ -276,17 +294,6 @@ def style_checks(md: str, brief: dict[str, str]) -> dict[str, object]:
         "specificity_points": specificity_points,
     }
     return {"gates": gates, "metrics": metrics}
-
-
-def update_qa(qa_path: Path, gates: dict[str, bool]) -> None:
-    if not qa_path.exists():
-        return
-    text = qa_path.read_text(encoding="utf-8")
-    for gate, status in gates.items():
-        value = "PASS" if status else "FAIL"
-        pattern = rf"(^-\s*{re.escape(gate)}\s*:\s*)(PASS|FAIL)"
-        text = re.sub(pattern, rf"\1{value}", text, flags=re.M) if re.search(pattern, text, flags=re.M) else text + f"\n- {gate}: {value}"
-    qa_path.write_text(text, encoding="utf-8")
 
 
 def write_report(path: Path, payload: dict[str, object]) -> None:

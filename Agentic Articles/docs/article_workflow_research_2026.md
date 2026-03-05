@@ -126,10 +126,10 @@ Jesli zaczniemy od samych fraz, czesto konczymy na sztucznej tresci. Intencja us
 ## 8. Rekomendowany pipeline end-to-end (v1)
 1. Intake briefu -> `article_brief.md`
 2. Research pack (intent + SERP + facts + keywords + blueprint) -> `article_research_pack.md`
-3. Draft v1 -> `article_draft_v1.md`
-4. QA + rewrite -> `qa_report.md`, `article_draft_v2.md`
-5. Agent QA approval + package ready for owner review -> `publish_ready.md`
-6. Export final article to Google Docs -> komunikat `ARTYKUL GOTOWY: <doc_url>`
+3. Working draft -> `article_draft_v2.md`
+4. Editorial QA loop + machine QA + rewrite -> `editorial_review.md`, `quality_gate.json`
+5. Export final article to Google Docs -> komunikat `ARTYKUL GOTOWY: <doc_url>`
+6. Cleanup -> lokalnie zostaja tylko `article_research_pack.md` i `final_output.md`
 
 ## 9. Ryzyka i anty-wzorce
 1. Thin content: dluga tresc bez realnej wartosci.
@@ -222,7 +222,7 @@ Rekomendowany model: hybryda lokalne repo + chmura Google.
 - Lokalny Markdown w repo (`Agentic Articles/workspace/...`) jako audytowalna historia zmian.
 
 2. Warstwa wspolpracy
-- Finalny `article_draft_v2.md` i `publish_ready.md` eksportowane do Google Docs w dedykowanym folderze.
+- Finalny `final_output.md` eksportowany do Google Docs w dedykowanym folderze.
 
 3. Praktyczne podejscie API
 - Uzyj Google Docs API do tworzenia/aktualizacji dokumentu.
@@ -235,7 +235,7 @@ Rekomendowany model: hybryda lokalne repo + chmura Google.
 - `/Agentic Articles/Archive/`
 
 5. Minimalne artefakty eksportu
-- Title, final body, metadata (topic, intent, voice, date), link do lokalnego workspace.
+- Title, final body, metadata (topic, intent, voice, date).
 
 ## 15. Szybki research narzedzi 2026 (co ma sens)
 

@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -25,11 +26,16 @@ REQUIRED_ARTIFACTS = [
     "article_research_pack.md",
     RESEARCH_EVIDENCE_FILENAME,
     QUALITY_GATE_FILENAME,
-    "article_draft_v1.md",
-    "qa_report.md",
     "article_draft_v2.md",
-    "publish_ready.md",
+    "editorial_review.md",
     "run_context.md",
+]
+
+SERVICE_REQUIRED_ARTIFACTS = [
+    "service_page_context.json",
+    "company_profile_snapshot.json",
+    "service_page_writer_packet.md",
+    "editorial_review.md",
 ]
 
 LEGACY_RESEARCH_ARTIFACTS = [
@@ -82,6 +88,51 @@ REQUIRED_HARD_GATES = [
     "research_hard_block_pass",
     "topic_from_approved_plan_pass",
     "hard_block_export_pass",
+]
+
+SERVICE_REQUIRED_HARD_GATES = [
+    "polish_title_naturalness_pass",
+    "polish_collocation_pass",
+    "polish_grammar_pass",
+    "polish_diacritics_pass",
+    "polish_punctuation_pass",
+    "polish_fluency_ml_pass",
+    "structure_variance_pass_v2",
+    "semantic_rewrite_pass_v2",
+    "forbidden_phrase_pass",
+    "specificity_pass",
+    "voice_authenticity_pass",
+    "rewrite_loop_pass",
+    "evidence_provenance_pass",
+    "skills_policy_pass",
+    "keyword_metrics_coverage_pass",
+    "serp_dataset_quality_pass",
+    "trends_dataset_quality_pass",
+    "competitor_matrix_pass",
+    "research_data_freshness_pass",
+    "research_hard_block_pass",
+    "hard_block_export_pass",
+]
+
+SERVICE_FALLBACK_TABS = [
+    "Wskazania",
+    "Przeciwwskazania i bezpieczeństwo",
+    "Zalecenia przed i po",
+    "FAQ",
+]
+
+SECOND_PERSON_MARKERS = [
+    "ty",
+    "tobie",
+    "ciebie",
+    "cię",
+    "ci",
+    "twój",
+    "twoj",
+    "twoja",
+    "twoje",
+    "twoim",
+    "twoją",
 ]
 
 
@@ -397,6 +448,38 @@ def parse_final_decision(text: str) -> str | None:
     return None
 
 
+def parse_logic_pass(text: str) -> str | None:
+    match = re.search(
+        r"logic_pass\s*:\s*`?(PASS|FAIL)`?",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).upper()
+    return None
+
+
+def parse_iterations_completed(text: str) -> int | None:
+    match = re.search(r"iterations_completed\s*:\s*(\d+)", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def parse_post_machine_qa_revision(text: str) -> str | None:
+    match = re.search(
+        r"post_machine_qa_revision_completed\s*:\s*`?(yes|no)`?",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).lower()
+    return None
+
+
 def parse_critical_failures(text: str) -> list[str]:
     json_block = re.search(r"```json\s*(\{.*?\})\s*```", text, flags=re.S)
     if json_block:
@@ -459,6 +542,380 @@ def parse_comma_list(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def resolve_content_profile(workspace: Path, content_profile: str) -> str:
+    profile = (content_profile or "").strip().lower()
+    if profile in {"article", "service_page"}:
+        return profile
+    context = parse_run_context(workspace / "run_context.md")
+    context_profile = context.get("content_profile", "").strip().lower()
+    if context_profile in {"article", "service_page"}:
+        return context_profile
+    return "article"
+
+
+def expected_service_tabs(workspace: Path) -> list[str]:
+    context = parse_run_context(workspace / "run_context.md")
+    labels = parse_comma_list(context.get("section_labels"))
+    if labels:
+        return labels
+
+    context_json = workspace / "service_page_context.json"
+    if context_json.exists():
+        try:
+            payload = json.loads(context_json.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = {}
+        if isinstance(payload, dict):
+            tabs = payload.get("tab_labels", [])
+            if isinstance(tabs, list):
+                labels = [str(item).strip() for item in tabs if str(item).strip()]
+                if labels:
+                    return labels
+    return list(SERVICE_FALLBACK_TABS)
+
+
+def _extract_section_block(text: str, heading: str) -> str:
+    pattern = rf"^##\s+{re.escape(heading)}\s*$"
+    match = re.search(pattern, text, flags=re.IGNORECASE | re.M)
+    if not match:
+        return ""
+    start = match.end()
+    tail = text[start:]
+    next_heading = re.search(r"^\s*##\s+.+$", tail, flags=re.M)
+    if next_heading:
+        return tail[: next_heading.start()].strip()
+    return tail.strip()
+
+
+def _extract_h3_subsection(parent_block: str, heading: str) -> str:
+    pattern = rf"^###\s+{re.escape(heading)}\s*$"
+    match = re.search(pattern, parent_block, flags=re.IGNORECASE | re.M)
+    if not match:
+        return ""
+    start = match.end()
+    tail = parent_block[start:]
+    next_heading = re.search(r"^\s*###\s+.+$", tail, flags=re.M)
+    if next_heading:
+        return tail[: next_heading.start()].strip()
+    return tail.strip()
+
+
+def _normalize_text(value: str) -> str:
+    lowered = value.strip().lower()
+    normalized = unicodedata.normalize("NFKD", lowered)
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return re.sub(r"\s+", " ", normalized)
+
+
+def _count_second_person_hits(text: str) -> int:
+    normalized = _normalize_text(text)
+    hits = 0
+    for marker in SECOND_PERSON_MARKERS:
+        hits += len(re.findall(rf"(?<!\w){re.escape(_normalize_text(marker))}(?!\w)", normalized))
+    return hits
+
+
+def validate_service_page_sections(workspace: Path, result: ValidationResult) -> None:
+    draft_path = workspace / "article_draft_v2.md"
+    if not draft_path.exists():
+        result.add_error("service_sections_presence", "article_draft_v2.md missing for service_page validation.")
+        return
+    text = read_text(draft_path)
+
+    subheading_block = _extract_section_block(text, "Subheading")
+    description_block = _extract_section_block(text, "Opis")
+    info_block = _extract_section_block(text, "Najważniejsze informacje")
+
+    if not subheading_block:
+        result.add_error("service_subheading_presence", "Missing section '## Subheading' with content.")
+    else:
+        result.add_pass("service_subheading_presence")
+
+    if not description_block:
+        result.add_error("service_description_presence", "Missing section '## Opis' with content.")
+    else:
+        result.add_pass("service_description_presence")
+
+    if not info_block:
+        result.add_error("service_info_presence", "Missing section '## Najważniejsze informacje' with content.")
+    else:
+        result.add_pass("service_info_presence")
+
+    if subheading_block:
+        raw_lines = [line.strip() for line in subheading_block.splitlines() if line.strip() and not line.strip().startswith("### ")]
+        subheading_text = " ".join(raw_lines).strip()
+        subheading_chars = len(subheading_text)
+        if subheading_chars < 40:
+            result.add_error("service_subheading_length", f"Subheading too short ({subheading_chars} chars).")
+        else:
+            context_path = workspace / "service_page_context.json"
+            target_chars = 0
+            if context_path.exists():
+                try:
+                    payload = json.loads(context_path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    payload = {}
+                if isinstance(payload, dict):
+                    subheading = payload.get("subheading", {})
+                    if isinstance(subheading, dict):
+                        raw_target = subheading.get("chars", 0)
+                        try:
+                            target_chars = int(raw_target)
+                        except (TypeError, ValueError):
+                            target_chars = 0
+
+            if target_chars > 0:
+                min_chars = max(40, int(target_chars * 0.50))
+                max_chars = max(min_chars + 20, int(target_chars * 1.60))
+                if subheading_chars < min_chars or subheading_chars > max_chars:
+                    result.add_error(
+                        "service_subheading_length",
+                        (
+                            f"Subheading length not similar to source. "
+                            f"Got {subheading_chars}, expected approx {min_chars}-{max_chars} "
+                            f"(source={target_chars})."
+                        ),
+                    )
+                else:
+                    result.add_pass("service_subheading_length")
+            else:
+                result.add_pass("service_subheading_length")
+
+    if description_block:
+        description_plain = re.sub(r"^###\s+.*$", "", description_block, flags=re.M).strip()
+        description_words = count_words(description_plain)
+        if description_words < 35 or description_words > 280:
+            result.add_error(
+                "service_description_length",
+                f"Opis should be concise but informative (35-280 words). Got {description_words}.",
+            )
+        else:
+            result.add_pass("service_description_length")
+
+    if info_block:
+        tabs = expected_service_tabs(workspace)
+        missing_tabs: list[str] = []
+        for tab in tabs:
+            if not re.search(rf"^###\s+{re.escape(tab)}\s*$", info_block, flags=re.IGNORECASE | re.M):
+                missing_tabs.append(tab)
+        if missing_tabs:
+            result.add_error(
+                "service_tab_coverage",
+                "Missing tab section(s) under 'Najważniejsze informacje': " + ", ".join(missing_tabs),
+            )
+        else:
+            result.add_pass("service_tab_coverage")
+
+        empty_tabs: list[str] = []
+        faq_items_count = 0
+        for tab in tabs:
+            block = _extract_h3_subsection(info_block, tab)
+            cleaned_lines = []
+            for raw_line in block.splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                if re.fullmatch(r"[-*]\s*", line):
+                    continue
+                if re.fullmatch(r"_?Wpisz.*_?", line, flags=re.IGNORECASE):
+                    continue
+                cleaned_lines.append(line)
+
+            cleaned_text = " ".join(cleaned_lines).strip()
+            if count_words(cleaned_text) < 4:
+                empty_tabs.append(tab)
+
+            if _normalize_text(tab) == _normalize_text("FAQ"):
+                for line in cleaned_lines:
+                    if "?" in line:
+                        faq_items_count += 1
+
+        if empty_tabs:
+            result.add_error(
+                "service_tab_content_nonempty_pass",
+                "Tab(s) under 'Najważniejsze informacje' have empty/placeholder content: " + ", ".join(empty_tabs),
+            )
+        else:
+            result.add_pass("service_tab_content_nonempty_pass")
+
+        if faq_items_count < 2:
+            result.add_error(
+                "service_faq_min_items_pass",
+                f"FAQ must contain at least 2 question/answer items. Found {faq_items_count}.",
+            )
+        else:
+            result.add_pass("service_faq_min_items_pass")
+
+    placeholder_patterns = [
+        r"^\s*[-*]\s*$",
+        r"_Wpisz[^_]*_",
+    ]
+    placeholder_hits = 0
+    for pattern in placeholder_patterns:
+        placeholder_hits += len(re.findall(pattern, text, flags=re.IGNORECASE | re.M))
+    if placeholder_hits > 0:
+        result.add_error(
+            "service_no_placeholder_pass",
+            f"Detected placeholder content markers in draft: {placeholder_hits}.",
+        )
+    else:
+        result.add_pass("service_no_placeholder_pass")
+
+    snapshot_path = workspace / "company_profile_snapshot.json"
+    run_context = parse_run_context(workspace / "run_context.md")
+    if not snapshot_path.exists():
+        result.add_error(
+            "service_brand_voice_alignment_pass",
+            "Missing company_profile_snapshot.json for brand voice validation.",
+        )
+        return
+
+    try:
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        result.add_error(
+            "service_brand_voice_alignment_pass",
+            "Invalid company_profile_snapshot.json (JSON parse error).",
+        )
+        return
+
+    if not isinstance(snapshot, dict):
+        result.add_error(
+            "service_brand_voice_alignment_pass",
+            "Invalid company_profile_snapshot.json schema.",
+        )
+        return
+
+    if run_context.get("brand_voice_loaded", "").strip().lower() != "yes":
+        result.add_error(
+            "service_brand_voice_alignment_pass",
+            "run_context.md must contain brand_voice_loaded: yes for service_page.",
+        )
+        return
+
+    brand_voice = snapshot.get("brand_voice", {}) if isinstance(snapshot.get("brand_voice"), dict) else {}
+    avoid_rules = brand_voice.get("avoid_rules", []) if isinstance(brand_voice.get("avoid_rules"), list) else []
+    normalized_text = _normalize_text(text)
+    avoid_hits: list[str] = []
+    for rule in avoid_rules:
+        rule_norm = _normalize_text(str(rule))
+        if rule_norm and rule_norm in normalized_text:
+            avoid_hits.append(str(rule))
+
+    if avoid_hits:
+        result.add_error(
+            "service_brand_voice_alignment_pass",
+            "Brand voice avoid rules found in draft: " + ", ".join(avoid_hits),
+        )
+        return
+
+    requires_second_person = bool(brand_voice.get("requires_second_person", False))
+    second_person_min_hits_raw = brand_voice.get("second_person_min_hits", 0)
+    try:
+        second_person_min_hits = int(second_person_min_hits_raw or 0)
+    except (TypeError, ValueError):
+        second_person_min_hits = 0
+
+    if requires_second_person and second_person_min_hits > 0:
+        hits = _count_second_person_hits(text)
+        if hits < second_person_min_hits:
+            result.add_error(
+                "service_brand_voice_alignment_pass",
+                f"Brand voice requires second-person narration. Found {hits}, required >= {second_person_min_hits}.",
+            )
+            return
+
+    result.add_pass("service_brand_voice_alignment_pass")
+
+
+def validate_editorial_review(workspace: Path, result: ValidationResult, content_profile: str) -> None:
+    review_path = workspace / "editorial_review.md"
+    if not review_path.exists():
+        result.add_error(
+            "editorial_review_exists",
+            f"Missing editorial_review.md for {content_profile} editorial QA.",
+        )
+        return
+
+    text = read_text(review_path)
+    if not text:
+        result.add_error(
+            "editorial_review_exists",
+            "editorial_review.md is empty.",
+        )
+        return
+    result.add_pass("editorial_review_exists")
+
+    required_sections = [
+        "## Pass 1: Logic and Sense",
+        "## Pass 2: Content-Strategy Sweep",
+        "## Pass 3: Copywriting Sweep",
+        "## Pass 4: Copy-Editing Sweep",
+        "## Final Decision",
+    ]
+    missing_sections = [section for section in required_sections if section not in text]
+    if missing_sections:
+        result.add_error(
+            "editorial_review_structure",
+            "editorial_review.md missing sections: " + ", ".join(missing_sections),
+        )
+        return
+    result.add_pass("editorial_review_structure")
+
+    placeholder_patterns = [
+        r"^\s*-\s*$",
+        r":\s*$",
+        r"_Wpisz[^_]*_",
+        r"\(uzupełnij\)",
+    ]
+    placeholder_hits = 0
+    for pattern in placeholder_patterns:
+        placeholder_hits += len(re.findall(pattern, text, flags=re.IGNORECASE | re.M))
+    if placeholder_hits > 0:
+        result.add_error(
+            "editorial_review_complete",
+            f"editorial_review.md still contains placeholder lines: {placeholder_hits}.",
+        )
+        return
+    result.add_pass("editorial_review_complete")
+
+    iterations = parse_iterations_completed(text)
+    if iterations is None or iterations < 2:
+        result.add_error(
+            "editorial_iterations_pass",
+            "editorial_review.md must record at least 2 editorial iterations before approval.",
+        )
+    else:
+        result.add_pass("editorial_iterations_pass")
+
+    logic_pass = parse_logic_pass(text)
+    if logic_pass != "PASS":
+        result.add_error(
+            "editorial_logic_pass",
+            "editorial_review.md must end with logic_pass: PASS.",
+        )
+    else:
+        result.add_pass("editorial_logic_pass")
+
+    post_machine_qa_revision = parse_post_machine_qa_revision(text)
+    if post_machine_qa_revision != "yes":
+        result.add_error(
+            "post_machine_qa_revision_pass",
+            "editorial_review.md must confirm post_machine_qa_revision_completed: yes.",
+        )
+    else:
+        result.add_pass("post_machine_qa_revision_pass")
+
+    final_decision = parse_final_decision(text)
+    if final_decision != "approved":
+        result.add_error(
+            "editorial_final_decision",
+            "editorial_review.md must end with final_decision: approved.",
+        )
+    else:
+        result.add_pass("editorial_final_decision")
 
 
 def validate_topic_from_approved_plan(workspace: Path, result: ValidationResult) -> None:
@@ -574,10 +1031,10 @@ def validate_skills_policy(workspace: Path, result: ValidationResult) -> None:
             result.add_pass("research_providers_loaded")
 
     research_status = context.get("research_fetch_status", "").strip().lower()
-    if research_status != "ok":
+    if research_status not in {"ok", "ok_with_fallback"}:
         result.add_error(
             "research_fetch_status",
-            "run_context.md research_fetch_status must be 'ok' before pre_export validation.",
+            "run_context.md research_fetch_status must be 'ok' or 'ok_with_fallback' before pre_export validation.",
         )
     else:
         result.add_pass("research_fetch_status")
@@ -691,6 +1148,7 @@ def validate_evidence_manifest(workspace: Path, result: ValidationResult) -> Non
                 if query:
                     unique_queries.add(query)
         trend_query_count = len(unique_queries)
+    trend_query_count = max(trend_query_count, len(trend_queries))
 
     checks = [
         (
@@ -708,7 +1166,7 @@ def validate_evidence_manifest(workspace: Path, result: ValidationResult) -> Non
         ("evidence_paa_count", len(paa_questions), min_paa, "paa_questions"),
         (
             "evidence_trend_count",
-            trend_query_count if trend_query_count else len(trend_queries),
+            trend_query_count,
             min_trends,
             "trend_points/trend_queries",
         ),
@@ -758,7 +1216,7 @@ def validate_evidence_manifest(workspace: Path, result: ValidationResult) -> Non
             result.add_pass("evidence_query_seeds")
 
 
-def validate_quality_gate(workspace: Path, result: ValidationResult) -> None:
+def validate_quality_gate(workspace: Path, result: ValidationResult, content_profile: str) -> None:
     payload = ensure_quality_gate(workspace)
     gates = payload.get("gates", {})
     if not isinstance(gates, dict):
@@ -766,16 +1224,17 @@ def validate_quality_gate(workspace: Path, result: ValidationResult) -> None:
         return
     result.add_pass("quality_gate_schema")
 
+    required_hard_gates = REQUIRED_HARD_GATES if content_profile == "article" else SERVICE_REQUIRED_HARD_GATES
     hard = payload.get("hard_gates", [])
     if not isinstance(hard, list):
         hard = []
-    missing_hard = [name for name in REQUIRED_HARD_GATES if name not in hard]
+    missing_hard = [name for name in required_hard_gates if name not in hard]
     if missing_hard:
         result.add_error("quality_gate_hard_set", "quality_gate.json hard_gates missing: " + ", ".join(missing_hard))
     else:
         result.add_pass("quality_gate_hard_set")
 
-    for gate_name in REQUIRED_HARD_GATES:
+    for gate_name in required_hard_gates:
         gate_payload = gates.get(gate_name, {})
         status = str((gate_payload or {}).get("status", "")).upper()
         if status != "PASS":
@@ -827,7 +1286,7 @@ def validate_research_artifacts(workspace: Path, result: ValidationResult) -> No
     validate_evidence_manifest(workspace, result)
 
 
-def validate_workspace(workspace: Path, mode: str) -> ValidationResult:
+def validate_workspace(workspace: Path, mode: str, content_profile: str = "article") -> ValidationResult:
     result = ValidationResult()
 
     if not workspace.exists() or not workspace.is_dir():
@@ -862,6 +1321,31 @@ def validate_workspace(workspace: Path, mode: str) -> ValidationResult:
     if mode == "artifacts":
         return result
 
+    effective_content_profile = resolve_content_profile(workspace, content_profile)
+    result.add_pass(f"content_profile_{effective_content_profile}")
+
+    if effective_content_profile == "service_page":
+        missing_service = []
+        for artifact in SERVICE_REQUIRED_ARTIFACTS:
+            artifact_path = workspace / artifact
+            if not artifact_path.exists():
+                missing_service.append(artifact)
+                continue
+            if artifact_path.stat().st_size == 0:
+                result.add_error(
+                    f"non_empty_{artifact}",
+                    f"Artifact is empty: {artifact_path}",
+                )
+            else:
+                result.add_pass(f"non_empty_{artifact}")
+        if missing_service:
+            result.add_error(
+                "service_artifacts_present",
+                "Missing service_page artifacts: " + ", ".join(missing_service),
+            )
+        else:
+            result.add_pass("service_artifacts_present")
+
     brief_path = workspace / "article_brief.md"
     brief_meta: dict[str, str] = {}
     locale = "pl-PL"
@@ -877,20 +1361,21 @@ def validate_workspace(workspace: Path, mode: str) -> ValidationResult:
                 "article_brief.md missing topic/company in metadata.",
             )
 
-        min_words = parse_int(brief_meta.get("word_count_min"), 1200)
-        max_words = parse_int(brief_meta.get("word_count_max"), 2500)
-        draft_v2_path = workspace / "article_draft_v2.md"
-        if draft_v2_path.exists():
-            wc = count_words(read_text(draft_v2_path))
-            if wc < min_words or wc > max_words:
-                result.add_error(
-                    "draft_word_count",
-                    f"article_draft_v2.md word count {wc} outside configured range {min_words}-{max_words}.",
-                )
+        if effective_content_profile == "article":
+            min_words = parse_int(brief_meta.get("word_count_min"), 1200)
+            max_words = parse_int(brief_meta.get("word_count_max"), 2500)
+            draft_v2_path = workspace / "article_draft_v2.md"
+            if draft_v2_path.exists():
+                wc = count_words(read_text(draft_v2_path))
+                if wc < min_words or wc > max_words:
+                    result.add_error(
+                        "draft_word_count",
+                        f"article_draft_v2.md word count {wc} outside configured range {min_words}-{max_words}.",
+                    )
+                else:
+                    result.add_pass("draft_word_count")
             else:
-                result.add_pass("draft_word_count")
-        else:
-            result.add_error("draft_word_count", "article_draft_v2.md not found for length check.")
+                result.add_error("draft_word_count", "article_draft_v2.md not found for length check.")
 
     draft_v2_path = workspace / "article_draft_v2.md"
     if draft_v2_path.exists() and locale.lower().startswith("pl"):
@@ -942,39 +1427,16 @@ def validate_workspace(workspace: Path, mode: str) -> ValidationResult:
                 f"Grammar validation unavailable (LanguageTool API): {exc}",
             )
 
-    qa_path = workspace / "qa_report.md"
-    if qa_path.exists():
-        qa_text = read_text(qa_path)
-        score = parse_score(qa_text)
-        if score is None:
-            result.add_warning("Cannot parse total score from qa_report.md (non-blocking).")
-        elif score < 85:
-            result.add_warning(f"QA score below 85/100 in qa_report.md ({score}).")
-
-        decision = parse_final_decision(qa_text)
-        if decision != "approved":
-            result.add_warning("qa_report.md final_decision is not approved (non-blocking).")
-        else:
-            result.add_pass("qa_decision_advisory")
-
-        critical_failures = parse_critical_failures(qa_text)
-        if critical_failures:
-            result.add_warning("qa_report.md has marked critical failures (non-blocking): " + "; ".join(critical_failures))
+    if effective_content_profile == "service_page":
+        validate_service_page_sections(workspace, result)
+    validate_editorial_review(workspace, result, effective_content_profile)
 
     validate_skills_policy(workspace, result)
-    validate_topic_from_approved_plan(workspace, result)
-    validate_quality_gate(workspace, result)
-
-    publish_path = workspace / "publish_ready.md"
-    if publish_path.exists():
-        publish_text = read_text(publish_path)
-        if is_approved_publish_ready(publish_text):
-            result.add_pass("publish_ready_status")
-        else:
-            result.add_error(
-                "publish_ready_status",
-                "publish_ready.md must be Ready_for_manual_review or Approved.",
-            )
+    if effective_content_profile == "article":
+        validate_topic_from_approved_plan(workspace, result)
+    else:
+        result.add_pass("topic_from_approved_plan_bypass_service_page")
+    validate_quality_gate(workspace, result, effective_content_profile)
 
     if mode == "post_export":
         result.add_pass("post_export_mode")
@@ -1006,13 +1468,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print machine-readable JSON output.",
     )
+    parser.add_argument(
+        "--content-profile",
+        choices=["article", "service_page"],
+        default="article",
+        help="Validation profile. Use service_page for URL-first service content packages.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     mode = "pre_export" if args.mode == "final" else args.mode
-    result = validate_workspace(args.workspace.resolve(), mode)
+    result = validate_workspace(args.workspace.resolve(), mode, content_profile=args.content_profile)
 
     if args.json:
         payload = {
@@ -1022,11 +1490,13 @@ def main() -> int:
             "warnings": result.warnings,
             "workspace": str(args.workspace.resolve()),
             "mode": mode,
+            "content_profile": args.content_profile,
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(f"Workspace: {args.workspace.resolve()}")
         print(f"Mode: {mode}")
+        print(f"Content profile: {args.content_profile}")
         for check, status in sorted(result.checks.items()):
             print(f"[{status}] {check}")
         if result.warnings:

@@ -10,7 +10,7 @@ from pathlib import Path
 from article_workflow_state import set_gate, set_many_gates
 from article_workflow_validate import clean_markdown_for_language_checks
 from humanization_detector import detector_checks
-from humanization_style import parse_brief, style_checks, update_qa, write_report
+from humanization_style import parse_brief, style_checks, write_report
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,7 +60,6 @@ def main() -> int:
         "report_path": str((workspace / args.report).resolve()),
     }
 
-    update_qa(workspace / "qa_report.md", gates)
     set_many_gates(
         workspace=workspace,
         gates=style_gates,
