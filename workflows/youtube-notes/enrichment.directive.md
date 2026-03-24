@@ -1,4 +1,4 @@
-# Directive: Transcript Notes Enrichment (v1)
+# Directive: Transcript Notes Enrichment (Multi-Agent v2)
 
 **Goal**: Wziąć bazowe notatki wygenerowane z transkryptu i przekształcić je w bardziej dopracowany dokument: konkretniejszy, praktyczniejszy, lepiej ustrukturyzowany i bardziej przydatny jako materiał do przekazania dalej.
 
@@ -10,8 +10,8 @@
 - `Enriched Notes - [Truncated Title].md`
 
 ## Status
-Ta dyrektywa definiuje osobny etap enrichmentu po bazowych notatkach.
-Jest source of truth dla przyszłego narzędzia wykonawczego.
+Ta dyrektywa definiuje aktywny etap enrichmentu po bazowych notatkach.
+To jest workflow agent-run, nie skrypt-first.
 
 ## Core Principle
 Enrichment nie tworzy dokumentu od zera. Jego zadaniem jest:
@@ -21,6 +21,27 @@ Enrichment nie tworzy dokumentu od zera. Jego zadaniem jest:
 - dodać przykłady i kontekst użycia,
 - poprawić strukturę i użyteczność skanowania,
 - podnieść jakość dokumentu jako handoff/tutorial.
+
+## Execution Model
+Ten workflow powinien być realizowany przez głównego agenta z użyciem uproszczonej orkiestracji multi-agent.
+
+Minimalny układ:
+- główny agent = orkiestrator i redaktor końcowy,
+- subagent 1 = wykrywanie luk i miejsc do rozwinięcia,
+- subagent 2 = enrichment/review jakości dokumentu.
+
+Nie trzeba dodawać większej liczby ról, jeśli 2 lekkie subagenty wystarczą.
+
+## Required Multi-Agent Behavior
+Główny agent powinien:
+1. wczytać `notes_path` i `transcript_path`,
+2. zlecić analizę luk jednemu subagentowi,
+3. zlecić krytykę jakości / handoff-readiness drugiemu subagentowi,
+4. scalić wyniki,
+5. samodzielnie napisać finalną wersję `Enriched Notes - ...md`.
+
+Subagenci nie powinni zapisywać finalnego dokumentu.
+Ich zadaniem jest dostarczyć materiał wejściowy do finalnej redakcji.
 
 ## What Enrichment Should Improve
 - zbyt krótkie sekcje,
@@ -46,6 +67,19 @@ Enrichment nie tworzy dokumentu od zera. Jego zadaniem jest:
   - logiczne grupowanie treści,
   - lekkie znaczniki wizualne, jeśli poprawiają czytelność.
 - Unikaj przepisywania dokumentu w stylu marketingowym albo zbyt akademickim.
+- Pozostaw agentowi swobodę decyzji, które fragmenty rzeczywiście warto rozwinąć.
+- Nie próbuj rozwijać każdej sekcji na siłę.
+
+## What Not To Force
+Nie narzucaj:
+- twardych word countów,
+- obowiązkowej liczby sekcji,
+- obowiązkowej liczby przykładów,
+- jednego sztywnego szablonu dokumentu,
+- obowiązkowego rozwijania każdego punktu,
+- sztucznego podziału na typ materiału.
+
+To ma być enrichment sensowny redakcyjnie, a nie mechaniczny.
 
 ## Anti-Patterns
 Unikaj:
@@ -58,10 +92,42 @@ Unikaj:
 ## Workflow
 1. Wczytaj bazowe notatki.
 2. Wczytaj transkrypt jako materiał wspierający i źródło doprecyzowań.
-3. Zidentyfikuj sekcje, które są zbyt skrótowe albo zbyt ogólne.
-4. Rozwiń je o dodatkowe objaśnienia, przykłady, praktyczne zastosowanie i lepszą strukturę.
-5. Dodaj tylko takie elementy, które zwiększają użyteczność dokumentu.
-6. Zapisz wynik jako `Enriched Notes - [Truncated Title].md`.
+3. Uruchom subagenta `Gap Finder`, który wskaże miejsca zbyt skrótowe, zbyt ogólne albo niewystarczająco praktyczne.
+4. Uruchom subagenta `Enrichment Reviewer`, który oceni handoff quality, strukturę i przydatność dokumentu dla innej osoby.
+5. Scal wyniki obu ról.
+6. Rozwiń tylko te sekcje, które rzeczywiście zyskają na enrichmentcie.
+7. Dodaj przykłady, doprecyzowania, praktyczne wskazówki i lepszą strukturę tam, gdzie to podnosi użyteczność.
+8. Zapisz wynik jako `Enriched Notes - [Truncated Title].md`.
+
+## Suggested Subagent Contracts
+
+### Subagent 1: Gap Finder
+Wejście:
+- `notes_path`
+- `transcript_path`
+
+Wyjście:
+- krótka lista sekcji lub fragmentów do rozwinięcia,
+- czego w nich brakuje,
+- opcjonalnie krótki sygnał z transkryptu, który uzasadnia rozwinięcie.
+
+### Subagent 2: Enrichment Reviewer
+Wejście:
+- `notes_path`
+- opcjonalnie wynik `Gap Finder`
+
+Wyjście:
+- uwagi o strukturze,
+- uwagi o handoff/tutorial quality,
+- uwagi o miejscach, które nadal brzmią zbyt roboczo albo zbyt skrótowo,
+- uwagi o brakujących przykładach lub praktycznych wskazówkach.
+
+## Validation Direction
+Po enrichmentcie główny agent powinien sprawdzić:
+- czy dokument jest wyraźnie bardziej użyteczny niż wersja bazowa,
+- czy nie wrócił meta-opis typu `autor mówi`, `w materiale`, `na tym filmie`,
+- czy zostały dodane sensowne rozwinięcia, a nie tylko większa objętość,
+- czy struktura pomaga w przekazaniu dokumentu komuś dalej.
 
 ## Relationship To Other Workflows
 - Upstream:

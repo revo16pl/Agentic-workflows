@@ -79,6 +79,8 @@ When a user request matches any workflow below, the agent should:
 - `transcript -> base notes`
 - `base notes + transcript -> enriched notes`
 
+The enrichment stage is agent-run and uses lightweight multi-agent orchestration rather than a rigid deterministic script.
+
 **Parent workflow**:
 - `workflows/youtube-notes/pipeline.directive.md`
 

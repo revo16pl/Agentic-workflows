@@ -36,6 +36,9 @@
 - [x] Zdecydować, które elementy enrichmentu mają być uniwersalne, a które zależne od tematu notatek
 - [ ] Zaprojektować dyrektywę i narzędzie wykonawcze dla enrichmentu
 - [ ] Zdefiniować sposób walidacji jakości po enrichmentcie
+- [x] Przestawić enrichment z pomysłu „osobny skrypt” na agent-run workflow
+- [x] Wymusić uproszczony układ multi-agent: orkiestrator + 2 lekkie role
+- [x] Usunąć z enrichmentu hard limity i zbyt sztywne wymagania
 
 ## Planned Task: YouTube Notes Pipeline
 - [x] Opisać nadrzędny pipeline łączący transcript, notes i enrichment

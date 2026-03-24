@@ -64,6 +64,14 @@ Skip transcript and base notes generation.
 Run:
 1. `workflows/youtube-notes/enrichment.directive.md`
 
+## Enrichment Mode
+The enrichment stage should be treated as an agent-run editorial pass, not as a deterministic script step.
+
+When enrichment is requested:
+- the main agent acts as orchestrator,
+- the enrichment stage should use a lightweight multi-agent setup,
+- the final merge and final file write stay with the main agent.
+
 ## Intent Mapping
 Interpret requests like this:
 
@@ -100,6 +108,7 @@ When the user request is compound, the agent should think in pipeline order, not
 This means:
 - first create missing upstream artifacts,
 - then create requested downstream artifacts,
+- if enrichment is requested, run it as a lightweight multi-agent editorial pass,
 - then report all produced paths together.
 
 ## Relationship To Other Workflows
