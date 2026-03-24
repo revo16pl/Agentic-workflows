@@ -1,102 +1,110 @@
 # Agent Skills & Capabilities
 
-This document lists specialized workflows and capabilities available to the agent orchestration system.
-
-## Website Extraction
-
-### Extract Framer Sites
-**Trigger phrases**: "extract framer site", "download framer website", "export from framer"
-
-**What it does**: Downloads a complete website (Framer or any site) including all pages and assets (images, CSS, JS, fonts, videos), and rewrites all references to work locally.
-
-**Directive**: `directives/extract_framer_site.md`
-
-**Example usage**:
-- "Extract https://example.framer.website"
-- "Download this site: mysite.framer.website with max 100 pages"
-
-**Output**: `framer_extracts/<site-name>/` with all pages and assets
-
-**Documentation**: [DOCS/FRAMER_EXTRACTION.md](FRAMER_EXTRACTION.md)
-
----
+This document lists the active workflows and project-local capabilities in this repo.
 
 ## How to Use This File
 
-When a user request matches any of the trigger phrases or capabilities listed above, the agent should:
+When a user request matches any workflow below, the agent should:
 
-1. Reference the corresponding directive in `directives/`
-2. Gather required inputs from the user
-3. Execute the appropriate script from `execution/`
-4. Report results using the documented output format
+1. Route to the corresponding workflow directive in `workflows/`
+2. Use the colocated scripts in that workflow's `scripts/` directory
+3. Write generated artifacts to `runtime/`
+4. Report final artifact paths back to the user
 
-## Adding New Skills
+## Active Workflows
 
-When you create a new capability/workflow, update this file with:
-- **Name** of the skill
-- **Trigger phrases** users might say
-- **Brief description** of what it does
-- **Path to directive** and execution script
-- **Example usage**
-- **Documentation link** (if applicable)
-
----
-
-## Content Workflow
-
-### Agentic Articles Workflow v1
+### Agentic Articles
 **Trigger phrases**: "article workflow", "seo article workflow", "agentic articles", "content pipeline", "blog workflow"
 
-**What it does**: Defines a complete artifact-driven SOP for writing high-quality SEO articles (PL local market), from brief and intent mapping through QA and final export to Google Docs.
+**What it does**: Runs the article production workflow for researched SEO/service-page content, including QA and Google Docs export.
 
-**Directive**: `directives/agentic_articles_workflow.md`
+**Workflow**: `workflows/agentic-articles/directive.md`
 
-**Primary docs**:
-- `Agentic Articles/docs/article_workflow_research_2026.md`
-- `Agentic Articles/docs/seo_copywriting_workflow_v1.md`
-- `Agentic Articles/docs/article_brief_template.md`
-- `Agentic Articles/docs/company_context_profiles.md`
+**Docs**:
+- `workflows/agentic-articles/docs/article_workflow_research_2026.md`
+- `workflows/agentic-articles/docs/seo_copywriting_workflow_v1.md`
+- `workflows/agentic-articles/docs/article_brief_template.md`
+- `workflows/agentic-articles/docs/service_page_brief_template.md`
+- `workflows/agentic-articles/docs/company_context_profiles.md`
 
-**Output**: Per-article workflow with compact final artifacts (`article_research_pack.md`, `final_output.md`) plus Google Docs export link returned by the agent.
+**Runtime output**:
+- `runtime/agentic-articles/workspace/`
+- `runtime/agentic-articles/deliverables/`
 
-### Required External Skills (skills.sh / marketingskills)
-Workflow v2.1 wymaga tych skilli na etapie pisania i QA:
-- `content-strategy` (brief + angle + struktura intent)
-- `copywriting` (outline + draft v1)
-- `copy-editing` (sweeps jakościowe i humanizacja redakcyjna)
-- `seo-audit` (on-page SEO checks)
-- `schema-markup` (spójność schema z treścią)
-- `ai-seo` (LLM/snippet readiness)
+### Content Planning
+**Trigger phrases**: "content planning", "planning sprint", "topic clustering", "run queue", "content backlog"
 
-### YouTube Notes Workflow v3 (installed local skills)
-Skille wspierające jakość notatek i redakcję wideo-syntez:
-- `content-strategy` (architektura notatek i hierarchia informacji)
-- `copy-editing` (polish językowy, usuwanie szablonowego brzmienia)
-- `copywriting` (nagłówki, flow narracji, czytelność)
-- `prompt-engineering` (stabilizacja promptów dla pass 1 / pass 2)
-- `doc-coauthoring` (iteracyjna redakcja i QA dokumentu)
-- `find-skills` (wyszukiwanie dodatkowych skilli pod summarization/research synthesis)
+**What it does**: Creates planning sprints, ingests keyword/SERP/PAA/trends data, clusters topics, gates the backlog, and prepares items for the article workflow.
 
----
+**Workflow**: `workflows/content-planning/directive.md`
 
-## Diagramming Workflow
+**Docs**:
+- `workflows/content-planning/docs/content_planning_sop_v1.md`
+- `workflows/content-planning/docs/content_plan_sheet_schema.md`
+
+**Runtime output**:
+- `runtime/agentic-articles/planning/`
+
+### Convert for AI
+**Trigger phrases**: "convert pptx for ai", "convert files for ai", "NotebookLM-ready pdf", "pptx to ai pdf"
+
+**What it does**: Converts PPTX input into AI-friendly PDF output with slide renders, extracted text, and optional AI-enriched descriptions.
+
+**Workflow**: `workflows/convert-for-ai/directive.md`
+
+**Runtime output**:
+- `runtime/convert-for-ai/input/`
+- `runtime/convert-for-ai/output/`
+- `runtime/tmp/convert-for-ai/`
+
+### Media Optimization
+**Trigger phrases**: "optimize media", "optimize images", "optimize videos", "web media optimization"
+
+**What it does**: Optimizes image and video assets for web delivery.
+
+**Workflow**: `workflows/media-optimization/directive.md`
+
+**Docs**:
+- `workflows/media-optimization/docs/README.md`
+
+**Runtime output**:
+- `runtime/media-optimization/input/`
+- `runtime/media-optimization/output/`
+
+### YouTube Notes Pipeline
+**Trigger phrases**: "zrób notatki z filmiku", "youtube notes", "transcript notes enrichment", "zrób transkrypt i notatki", "ulepsz notatki z youtube", "enrichment notatek"
+
+**What it does**: Chains YouTube note workflows into one pipeline:
+- `video -> transcript`
+- `transcript -> base notes`
+- `base notes + transcript -> enriched notes`
+
+**Parent workflow**:
+- `workflows/youtube-notes/pipeline.directive.md`
+
+**Stages**:
+- `workflows/youtube-notes/transcript.directive.md`
+- `workflows/youtube-notes/notes.directive.md`
+- `workflows/youtube-notes/enrichment.directive.md`
+
+**Runtime output**:
+- `runtime/youtube-notes/`
+
+## Project-Local Skills
+
+Most skills are available globally in Codex and are not duplicated in this repo.
+
+The one project-local skill currently kept in-repo is:
 
 ### FigJam Workflow Diagramming
-**Trigger phrases**: "workflow diagram", "process map", "SOP diagram", "pipeline diagram", "figjam workflow", "zrób diagram workflow", "opisz proces na figjamie", "mapowanie procesu"
+**Skill path**: `skills-local/figjam-workflow-diagramming/SKILL.md`
 
-**What it does**: Tworzy dokumentacyjne (SOP-grade) diagramy workflow w FigJam dla onboardingu i operacji. Domyślnie wymusza układ lewo->prawo, sekcje per krok, podkroki w sekcjach, opisy plików osadzone w tym samym kroku oraz czytelną logikę PASS/FAIL z legendą.
-Każdy krok musi opisać: co się dzieje teraz, po co krok istnieje, jakie narzędzia/API/frameworky są użyte, jaki jest output, jaki jest warunek przejścia i co blokuje przejście.
-
-**Skill path (project-local)**: `skills/figjam-workflow-diagramming/SKILL.md`
+**What it does**: Provides project-specific workflow diagramming rules, references, and agent config for FigJam diagrams.
 
 **Bundled references**:
-- `skills/figjam-workflow-diagramming/references/style-system.md`
-- `skills/figjam-workflow-diagramming/references/content-patterns.md`
-- `skills/figjam-workflow-diagramming/references/diagram-templates.md`
-- `skills/figjam-workflow-diagramming/references/qa-rubric.md`
-- `skills/figjam-workflow-diagramming/references/anti-patterns.md`
-- `skills/figjam-workflow-diagramming/references/process-mapping-best-practices.md`
-
-**Example usage**:
-- "Zrób diagram workflow onboardingu klienta na FigJam"
-- "Create a process map for our release workflow in FigJam"
+- `skills-local/figjam-workflow-diagramming/references/style-system.md`
+- `skills-local/figjam-workflow-diagramming/references/content-patterns.md`
+- `skills-local/figjam-workflow-diagramming/references/diagram-templates.md`
+- `skills-local/figjam-workflow-diagramming/references/qa-rubric.md`
+- `skills-local/figjam-workflow-diagramming/references/anti-patterns.md`
+- `skills-local/figjam-workflow-diagramming/references/process-mapping-best-practices.md`

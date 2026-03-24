@@ -1,0 +1,502 @@
+#!/usr/bin/env python3
+"""
+Create a workspace for one article run in Agentic Articles workflow.
+
+Usage:
+    python3 workflows/agentic-articles/scripts/article_workflow_init.py \
+      --topic "Zalety treningu EMS w Niepolomicach" \
+      --company "studio balans"
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import re
+import sys
+import unicodedata
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_WORKSPACE_ROOT = PROJECT_ROOT / "runtime" / "agentic-articles" / "workspace"
+DEFAULT_DOCS_ROOT = PROJECT_ROOT / "workflows" / "agentic-articles" / "docs"
+
+REQUIRED_ARTIFACTS = [
+    "article_brief.md",
+    "article_research_pack.md",
+    "research_evidence_manifest.json",
+    "quality_gate.json",
+    "article_draft_v2.md",
+    "editorial_review.md",
+]
+
+
+def slugify(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_text).strip("-").lower()
+    return slug or "article"
+
+
+def write_text(path: Path, content: str, force: bool) -> None:
+    if path.exists() and not force:
+        return
+    path.write_text(content, encoding="utf-8")
+
+
+def artifacts_for_profile(content_profile: str) -> list[str]:
+    return list(REQUIRED_ARTIFACTS)
+
+
+def ensure_run_context_defaults(
+    path: Path,
+    topic: str,
+    company: str,
+    content_profile: str = "article",
+    source_url: str = "",
+    section_policy: str = "inherited",
+    section_labels: str = "",
+    subheading_length_target: str = "similar",
+    planning_sprint_id: str = "",
+    planning_topic_id: str = "",
+    planning_row_status: str = "",
+    planning_queue_path: str = "",
+) -> None:
+    """Backfill required v3.0 fields without overwriting existing run context."""
+    defaults = {
+        "topic": topic,
+        "company": company,
+        "content_profile": content_profile,
+        "source_url": source_url,
+        "section_policy": section_policy,
+        "section_labels": section_labels,
+        "subheading_length_target": subheading_length_target,
+        "created_at": dt.datetime.now().isoformat(timespec="seconds"),
+        "workflow_version": "v3.0",
+        "data_mode": "external_only",
+        "skills_required": "content-strategy, copywriting, copy-editing, seo-audit, schema-markup, ai-seo",
+        "skills_loaded": "",
+        "skills_applied": "",
+        "research_providers_loaded": "",
+        "research_fetch_started_at": "",
+        "research_fetch_finished_at": "",
+        "research_fetch_status": "",
+        "research_fallback_reason": "",
+        "research_confidence": "",
+        "company_profile_id": "",
+        "brand_voice_loaded": "",
+        "planning_sprint_id": planning_sprint_id,
+        "planning_topic_id": planning_topic_id,
+        "planning_row_status": planning_row_status,
+        "planning_queue_path": planning_queue_path,
+    }
+
+    if not path.exists():
+        lines = ["# run_context.md", ""]
+        lines.extend([f"- {key}: {value}" for key, value in defaults.items()])
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+
+    existing = path.read_text(encoding="utf-8")
+    values: dict[str, str] = {}
+    lines = existing.splitlines()
+    for raw in lines:
+        line = raw.strip()
+        if not line.startswith("- ") or ":" not in line:
+            continue
+        key, value = line[2:].split(":", 1)
+        values[key.strip()] = value.strip()
+
+    changed = False
+    for key, value in defaults.items():
+        if key not in values:
+            lines.append(f"- {key}: {value}")
+            changed = True
+
+    # Always upgrade workflow version marker when missing/legacy.
+    if values.get("workflow_version", "").strip() in {"", "v1", "v2.1"}:
+        updated_lines: list[str] = []
+        replaced = False
+        for raw in lines:
+            if raw.strip().startswith("- workflow_version:"):
+                updated_lines.append("- workflow_version: v3.0")
+                replaced = True
+                changed = True
+            else:
+                updated_lines.append(raw)
+        if not replaced:
+            updated_lines.append("- workflow_version: v3.0")
+            changed = True
+        lines = updated_lines
+
+    if changed:
+        path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def template_for(
+    filename: str,
+    topic: str,
+    company: str,
+    today: str,
+    content_profile: str = "article",
+) -> str:
+    if filename == "article_research_pack.md":
+        return (
+            "# article_research_pack.md\n\n"
+            "## Topic\n"
+            f"- {topic}\n\n"
+            "## 1) Intent Map\n"
+            "- Dominant intent:\n"
+            "- Secondary intent:\n"
+            "- Intent-fit hypothesis:\n\n"
+            "## 2) SERP Snapshot (Top 10)\n"
+            "| # | URL | Title | Intent | Format | Notes |\n"
+            "|---|---|---|---|---|---|\n"
+            "| 1 |  |  |  |  |  |\n"
+            "| 2 |  |  |  |  |  |\n"
+            "| 3 |  |  |  |  |  |\n"
+            "| 4 |  |  |  |  |  |\n"
+            "| 5 |  |  |  |  |  |\n"
+            "| 6 |  |  |  |  |  |\n"
+            "| 7 |  |  |  |  |  |\n"
+            "| 8 |  |  |  |  |  |\n"
+            "| 9 |  |  |  |  |  |\n"
+            "| 10 |  |  |  |  |  |\n\n"
+            "## 3) Content Gaps\n"
+            "1.\n"
+            "2.\n"
+            "3.\n"
+            "4.\n"
+            "5.\n\n"
+            "## 3b) Evidence Contract (required)\n"
+            "| Insight | source_tool | query_seed | url | date_range | pulled_at | locale | country | device | confidence |\n"
+            "|---|---|---|---|---|---|---|---|---|---|\n"
+            "|  |  |  |  |  |  | pl-PL | PL | desktop |  |\n\n"
+            "## 4) Fact Bank\n"
+            "| Teza | Dowod | URL | Data publikacji/aktualizacji |\n"
+            "|---|---|---|---|\n"
+            "|  |  |  |  |\n\n"
+            "## 5) Keyword Cluster\n"
+            "- Primary keyword:\n"
+            "- Secondary keywords (min 30):\n"
+            "- Entities:\n"
+            "- PAA questions (min 10):\n"
+            "- Trend queries (min 5):\n\n"
+            "## 6) Article Blueprint\n"
+            "### H1\n"
+            "- \n\n"
+            "### Outline (H2/H3 + section goal + word budget)\n"
+            "1.\n\n"
+            "### Internal linking plan\n"
+            "- \n\n"
+            "### Schema recommendation\n"
+            "- \n\n"
+            "### Answer-first blocks\n"
+            "- \n"
+        )
+
+    if filename == "research_evidence_manifest.json":
+        return (
+            "{\n"
+            '  "version": "3.0",\n'
+            '  "data_mode": "external_only",\n'
+            f'  "topic": {json_string(topic)},\n'
+            f'  "company": {json_string(company)},\n'
+            f'  "generated_at": {json_string(today)},\n'
+            '  "providers": {\n'
+            '    "keyword_metrics": "google_ads_keyword_planner_api",\n'
+            '    "serp": "serper",\n'
+            '    "serp_fallback": "serpapi",\n'
+            '    "trends": "pytrends"\n'
+            "  },\n"
+            '  "query_seeds": [],\n'
+            '  "minimum_dataset": {\n'
+            '    "serp_top10_urls": 10,\n'
+            '    "keyword_phrases": 30,\n'
+            '    "paa_questions": 10,\n'
+            '    "trend_queries": 5,\n'
+            '    "keyword_metrics": 40,\n'
+            '    "serp_results": 30,\n'
+            '    "competitor_matrix": 10\n'
+            "  },\n"
+            '  "keyword_metrics": [],\n'
+            '  "serp_results": [],\n'
+            '  "trend_points": [],\n'
+            '  "competitor_matrix": [],\n'
+            '  "content_gaps": [],\n'
+            '  "serp_urls": [],\n'
+            '  "keyword_phrases": [],\n'
+            '  "paa_questions": [],\n'
+            '  "trend_queries": [],\n'
+            '  "sources": []\n'
+            "}\n"
+        )
+
+    if filename == "quality_gate.json":
+        return (
+            "{\n"
+            '  "version": "3.0",\n'
+            f'  "updated_at": {json_string(today)},\n'
+            '  "overall_pass": false,\n'
+            '  "hard_gates": [],\n'
+            '  "gates": {}\n'
+            "}\n"
+        )
+
+    if filename == "article_draft_v2.md":
+        if content_profile == "service_page":
+            return (
+                "# article_draft_v2.md\n\n"
+                "## Subheading\n"
+                "_Wpisz lead o podobnej dlugosci do aktualnej strony uslugowej._\n\n"
+                "## Opis\n"
+                "### Akapit 1\n"
+                "\n"
+                "### Akapit 2\n"
+                "\n"
+                "### Akapit 3\n"
+                "\n"
+                "## Najważniejsze informacje\n"
+                "### Wskazania\n"
+                "- \n"
+                "### Przeciwwskazania i bezpieczeństwo\n"
+                "- \n"
+                "### Zalecenia przed i po\n"
+                "- \n"
+                "### FAQ\n"
+                "- \n"
+            )
+        return "# article_draft_v2.md\n\n"
+
+    if filename == "editorial_review.md":
+        editorial_template = DEFAULT_DOCS_ROOT / "editorial_review_template.md"
+        if editorial_template.exists():
+            return editorial_template.read_text(encoding="utf-8")
+        return (
+            "# editorial_review.md\n\n"
+            "## Pass 1: Logic and Sense\n"
+            "- weird_phrases:\n"
+            "- logic_gaps:\n"
+            "- rewrite_decisions:\n\n"
+            "## Pass 2: Copywriting Sweep\n"
+            "- clarity_fixes:\n"
+            "- benefit_fixes:\n"
+            "- structure_fixes:\n\n"
+            "## Pass 3: Copy-editing Sweep\n"
+            "- awkward_sentences_removed:\n"
+            "- tone_alignment_fixes:\n"
+            "- final_polish:\n\n"
+            "## Final Decision\n"
+            "- iterations_completed: 0\n"
+            "- logic_pass: FAIL\n"
+            "- post_machine_qa_revision_completed: no\n"
+            "- final_decision: revise\n"
+            "- notes:\n"
+        )
+
+    return f"# {filename}\n\n"
+
+
+def json_string(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def create_workspace(
+    topic: str,
+    company: str,
+    date_str: str,
+    workspace_root: Path,
+    docs_root: Path,
+    force: bool,
+    content_profile: str = "article",
+    source_url: str = "",
+    section_policy: str = "inherited",
+    section_labels: str = "",
+    subheading_length_target: str = "similar",
+    planning_sprint_id: str = "",
+    planning_topic_id: str = "",
+    planning_row_status: str = "",
+    planning_queue_path: str = "",
+) -> Path:
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    slug = slugify(topic)
+    workspace_dir = workspace_root / f"{date_str}_{slug}"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+
+    if content_profile == "service_page":
+        brief_template = docs_root / "service_page_brief_template.md"
+    else:
+        brief_template = docs_root / "article_brief_template.md"
+    brief_path = workspace_dir / "article_brief.md"
+    if brief_template.exists():
+        brief_content = brief_template.read_text(encoding="utf-8")
+    else:
+        brief_content = "# article_brief.md\n\n"
+    write_text(brief_path, brief_content, force=force)
+
+    for artifact in artifacts_for_profile(content_profile):
+        artifact_path = workspace_dir / artifact
+        if artifact == "article_brief.md":
+            continue
+        content = template_for(
+            artifact,
+            topic=topic,
+            company=company,
+            today=date_str,
+            content_profile=content_profile,
+        )
+        write_text(artifact_path, content, force=force)
+
+    run_context_path = workspace_dir / "run_context.md"
+    if force:
+        run_context_content = (
+            "# run_context.md\n\n"
+            f"- topic: {topic}\n"
+            f"- company: {company}\n"
+            f"- content_profile: {content_profile}\n"
+            f"- source_url: {source_url}\n"
+            f"- section_policy: {section_policy}\n"
+            f"- section_labels: {section_labels}\n"
+            f"- subheading_length_target: {subheading_length_target}\n"
+            f"- created_at: {dt.datetime.now().isoformat(timespec='seconds')}\n"
+            "- workflow_version: v3.0\n"
+            "- data_mode: external_only\n"
+            "- skills_required: content-strategy, copywriting, copy-editing, seo-audit, schema-markup, ai-seo\n"
+            "- skills_loaded: \n"
+            "- skills_applied: \n"
+            "- research_providers_loaded: \n"
+            "- research_fetch_started_at: \n"
+            "- research_fetch_finished_at: \n"
+            "- research_fetch_status: \n"
+            "- research_fallback_reason: \n"
+            "- research_confidence: \n"
+            "- company_profile_id: \n"
+            "- brand_voice_loaded: \n"
+            f"- planning_sprint_id: {planning_sprint_id}\n"
+            f"- planning_topic_id: {planning_topic_id}\n"
+            f"- planning_row_status: {planning_row_status}\n"
+            f"- planning_queue_path: {planning_queue_path}\n"
+        )
+        write_text(run_context_path, run_context_content, force=True)
+    else:
+        ensure_run_context_defaults(
+            run_context_path,
+            topic=topic,
+            company=company,
+            content_profile=content_profile,
+            source_url=source_url,
+            section_policy=section_policy,
+            section_labels=section_labels,
+            subheading_length_target=subheading_length_target,
+            planning_sprint_id=planning_sprint_id,
+            planning_topic_id=planning_topic_id,
+            planning_row_status=planning_row_status,
+            planning_queue_path=planning_queue_path,
+        )
+    return workspace_dir
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Initialize workspace for Agentic Articles workflow.",
+    )
+    parser.add_argument("--topic", required=True, help="Article topic.")
+    parser.add_argument(
+        "--company",
+        required=True,
+        help='Company in natural language, e.g. "studio balans".',
+    )
+    parser.add_argument(
+        "--date",
+        default=dt.date.today().isoformat(),
+        help="Workspace date prefix (YYYY-MM-DD).",
+    )
+    parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        default=DEFAULT_WORKSPACE_ROOT,
+        help='Default: "runtime/agentic-articles/workspace".',
+    )
+    parser.add_argument(
+        "--docs-root",
+        type=Path,
+        default=DEFAULT_DOCS_ROOT,
+        help='Default: "workflows/agentic-articles/docs".',
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing artifact files if present.",
+    )
+    parser.add_argument(
+        "--content-profile",
+        choices=["article", "service_page"],
+        default="article",
+        help="Output profile. article=long-form SEO article, service_page=service subpage content package.",
+    )
+    parser.add_argument(
+        "--source-url",
+        default="",
+        help="Source service page URL (required for content-profile=service_page).",
+    )
+    parser.add_argument(
+        "--section-policy",
+        choices=["inherited", "fixed"],
+        default="inherited",
+        help="How to resolve section labels for service page tabs.",
+    )
+    parser.add_argument("--planning-sprint-id", default="", help="Planning sprint id from Workflow A.")
+    parser.add_argument("--planning-topic-id", default="", help="Topic id from content planning backlog/queue.")
+    parser.add_argument(
+        "--planning-row-status",
+        default="",
+        help="Planning row status (expected: approved) used by Workflow B hard checks.",
+    )
+    parser.add_argument(
+        "--planning-queue-path",
+        default="",
+        help="Absolute path to run_queue.csv used to source this article topic.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", args.date):
+        print("ERROR: --date must be in YYYY-MM-DD format.", file=sys.stderr)
+        return 1
+    if args.content_profile == "service_page" and not args.source_url.strip():
+        print("ERROR: --source-url is required when --content-profile=service_page.", file=sys.stderr)
+        return 1
+
+    workspace_dir = create_workspace(
+        topic=args.topic.strip(),
+        company=args.company.strip(),
+        date_str=args.date,
+        workspace_root=args.workspace_root.resolve(),
+        docs_root=args.docs_root.resolve(),
+        force=args.force,
+        content_profile=args.content_profile,
+        source_url=args.source_url.strip(),
+        section_policy=args.section_policy.strip(),
+        section_labels="",
+        subheading_length_target="similar",
+        planning_sprint_id=args.planning_sprint_id.strip(),
+        planning_topic_id=args.planning_topic_id.strip(),
+        planning_row_status=args.planning_row_status.strip(),
+        planning_queue_path=args.planning_queue_path.strip(),
+    )
+
+    print(f"Workspace ready: {workspace_dir}")
+    print("Artifacts:")
+    for name in artifacts_for_profile(args.content_profile):
+        print(f"- {workspace_dir / name}")
+    print(f"- {workspace_dir / 'run_context.md'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,111 @@
+# TODO
+
+## Current Task
+- [x] Spisać podejście do nowego workflow `transcript -> notes`
+- [x] Dodać osobną dyrektywę z miękką hybrydą notatek
+- [x] Sprawdzić, czy dyrektywa nie narzuca twardych gate'ów ani sztywnej struktury
+- [x] Wygenerować transkrypt dla `https://youtu.be/MxyRjL7NG18?si=dwPtZIoOySzGLSR9`
+- [x] Przepisać workflow notatek pod nową dyrektywę
+- [x] Wygenerować notatki z nowego transkryptu
+- [x] Zweryfikować oba artefakty
+- [ ] Rozbudować notatki tak, aby były bardziej kompleksowe jak na 6h materiału
+- [ ] Przestawić output notatek na język polski
+- [ ] Dodać do notatek bardziej opisowe sekcje i przykłady
+- [ ] Wygenerować poprawioną wersję notatek i zweryfikować jakość
+- [x] Rozbudować notatki tak, aby były bardziej kompleksowe jak na 6h materiału
+- [x] Przestawić output notatek na język polski
+- [x] Dodać do notatek bardziej opisowe sekcje i przykłady
+- [x] Wygenerować poprawioną wersję notatek i zweryfikować jakość
+- [x] Ręcznie przepisać początek dokumentu na bardziej tutorialowy opis frameworku
+- [x] Rozwinąć sekcję `Najważniejsze idee` o dokładniejsze wyjaśnienia i przykłady
+- [x] Usunąć z początku dokumentu odniesienia do „materiału” i źródła jako osi narracji
+- [ ] Dodać wyraźniejszą strukturę wizualną i hierarchię sekcji
+- [ ] Rozbudować praktyczne sekcje, przykłady i wskazówki wdrożeniowe
+- [ ] Zrobić z dokumentu bardziej użyteczny artefakt do przekazywania dalej
+
+## Planned Task: Transcript Notes Enrichment
+- [ ] Zdefiniować osobny workflow `transcript_notes_enrichment` jako etap po bazowych notatkach
+- [ ] Ustalić wejścia i wyjścia workflowu enrichment
+- [ ] Opisać zasady enrichmentu: doprecyzowanie, praktyczność, przykłady, struktura, handoff quality
+- [ ] Zdecydować, które elementy enrichmentu mają być uniwersalne, a które zależne od tematu notatek
+- [ ] Zaprojektować dyrektywę i narzędzie wykonawcze dla enrichmentu
+- [ ] Zdefiniować sposób walidacji jakości po enrichmentcie
+- [x] Zdefiniować osobny workflow `transcript_notes_enrichment` jako etap po bazowych notatkach
+- [x] Ustalić wejścia i wyjścia workflowu enrichment
+- [x] Opisać zasady enrichmentu: doprecyzowanie, praktyczność, przykłady, struktura, handoff quality
+- [x] Zdecydować, które elementy enrichmentu mają być uniwersalne, a które zależne od tematu notatek
+- [ ] Zaprojektować dyrektywę i narzędzie wykonawcze dla enrichmentu
+- [ ] Zdefiniować sposób walidacji jakości po enrichmentcie
+
+## Planned Task: YouTube Notes Pipeline
+- [x] Opisać nadrzędny pipeline łączący transcript, notes i enrichment
+- [x] Zdefiniować reguły kolejności i skip logic
+- [x] Dopisać relacje upstream/downstream w istniejących dyrektywach
+- [x] Dodać pipeline do `DOCS/SKILLS.md` dla łatwiejszego wykrywania
+
+## Current Task: Repo Cleanup + Restructure
+- [x] Utworzyć nową strukturę `workflows/`, `runtime/`, `skills-local/`, `archive/do-usuniecia/`
+- [x] Przenieść aktywne workflowy do katalogów per-workflow
+- [x] Przenieść runtime/outputy poza source-of-truth
+- [x] Zarchiwizować Framer stack, stare agent configi, lokalne binarki i duplikaty skills
+- [x] Odpiąć workflow artykułowy od lokalnego wymogu `./skills/<name>/SKILL.md`
+- [x] Zaktualizować główne instrukcje repo (`AGENTS.md`, `SKILL_SETUP.md`, `docs/SKILLS.md`)
+- [x] Przepiąć aktywne skrypty i dyrektywy na nowe ścieżki
+- [x] Wykonać smoke testy aktywnych workflowów
+
+## Review
+- Zapisano lesson po korekcie użytkownika: dla długich materiałów notatki mają być wyraźnie bardziej kompleksowe i w preferowanym języku użytkownika.
+- Rozbudowano `execution/generate_youtube_notes.py`:
+  - sekcje i copy przestawiono na język polski,
+  - rozszerzono zakres treści dla długich materiałów,
+  - dodano bardziej opisowe sekcje (`Jak układać własny workflow`, `Typowe błędy i ryzyka`),
+  - dodano sekcję `Przykłady z materiału`,
+  - utrzymano brak meta-komentarza typu `author says` / `the speaker`.
+- Wygenerowano poprawioną wersję notatek:
+  - `YouTube_transcripts/AGENTIC WORKFLOWS 6 HOUR COURSE Beginner to Pro (2026)/Notes - AGENTIC WORKFLOWS 6 HOUR COURS....md`
+- Weryfikacja:
+  - `python3 -m py_compile execution/generate_youtube_notes.py` -> PASS
+  - `.venv/bin/python execution/generate_youtube_notes.py "<transcript_path>"` -> PASS
+  - ręczny review notatek: tekst po polsku, sekcje bardziej rozbudowane, brak fraz typu `author says`, `the speaker`, `in this video`, `what i want to do`, `i'm going to`
+  - metryki końcowe: około 1382 słów i 16 nagłówków/podnagłówków
+- Ręcznie przepisano początek docelowego pliku notatek:
+  - nowy tytuł: `Agentic Workflows i DOE Framework`
+  - nowy ogólny opis bez trybu „to jest materiał / wideo”
+  - rozbudowane `Najważniejsze idee` dla: `Agentic Workflows`, `DOE Framework`, `Directive`, `Orkiestracja`, `Execution`, `Skills`, `MCP`, `Orkiestracja wieloagentowa`
+  - ręczny review potwierdził brak fraz typu `ten materiał`, `w materiale`, `na tym filmie`, `autor mówi`, `speaker`, `Źródło:`
+  - aktualna długość pliku po ręcznej rozbudowie: około 2380 słów
+- Pending kolejnej iteracji:
+  - lepsza struktura wizualna,
+  - delikatne emoji w nagłówkach,
+  - enrichment sekcji praktycznych i przykładów,
+  - przygotowanie dokumentu pod handoff/tutorial.
+- Dodano nowe dyrektywy:
+  - `directives/transcript_notes_enrichment.md`
+  - `directives/youtube_notes_pipeline.md`
+- Zaktualizowano relacje między workflowami:
+  - `directives/process_youtube_video.md`
+  - `directives/transcript_to_notes.md`
+- Dodano wpis do `DOCS/SKILLS.md`, żeby pipeline był łatwiejszy do wykrycia po trigger phrases i żeby agent wiedział, że te trzy etapy mogą działać jako jeden łańcuch.
+- Repo zostało przeorganizowane do nowego układu:
+  - `workflows/` jako source-of-truth dla aktywnych workflowów,
+  - `runtime/` jako miejsce na generowane artefakty,
+  - `skills-local/` tylko dla projektowego skilla FigJam,
+  - `archive/do-usuniecia/` jako staging dla rzeczy wycofanych lub podejrzanych.
+- Zarchiwizowano:
+  - cały Framer stack,
+  - lokalne duplikaty globalnych skills,
+  - `CLAUDE.md`, `GEMINI.md`, `.claude/`,
+  - `.bin/`, `.venv/`,
+  - stare wygenerowane artefakty i historyczne outputy.
+- Zaktualizowano aktywne ścieżki w workflowach i dokumentacji pod nową strukturę.
+- `.gitignore` rozszerzono o `runtime/`, `tmp/`, `.venv/`, `.claude/` i katalogi archiwalne z odpadami.
+- Smoke testy:
+  - `python3 -m py_compile workflows/.../scripts/*.py` -> PASS
+  - `python3 workflows/agentic-articles/scripts/article_workflow_init.py --help` -> PASS
+  - `python3 workflows/content-planning/scripts/content_planning_autopilot.py --help` -> PASS
+  - `python3 workflows/content-planning/scripts/content_planning_init.py --sprint-date 2026-03-24 --companies "demo company" --force` -> PASS
+  - `python3 workflows/agentic-articles/scripts/article_workflow_init.py --topic "Demo topic" --company "demo company" --date 2026-03-24 --force` -> PASS
+  - `python3 workflows/convert-for-ai/scripts/convert_for_ai.py` -> PASS (graceful no-input exit)
+  - `python3 workflows/youtube-notes/scripts/extract_youtube_transcript.py '<url>'` -> PASS
+  - `python3 workflows/youtube-notes/scripts/generate_youtube_notes.py '<transcript_path>'` -> PASS
+  - `bash workflows/media-optimization/optimize.sh` -> PASS for image processing, but video processing is currently degraded because system `ffmpeg` / `ffprobe` are not installed on this machine

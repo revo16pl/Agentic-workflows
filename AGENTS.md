@@ -1,23 +1,21 @@
 # Agent Instructions
 
-> This file is mirrored across CLAUDE.md, AGENTS.md, and GEMINI.md so the same instructions load in any AI environment.
-
 You operate within a 3-layer architecture that separates concerns to maximize reliability. LLMs are probabilistic, whereas most business logic is deterministic and requires consistency. This system fixes that mismatch.
 
 ## The 3-Layer Architecture
 
 **Layer 1: Directive (What to do)**
-- Basically just SOPs written in Markdown, live in `directives/`
+- Basically just SOPs written in Markdown, live in `workflows/*/*.md`
 - Define the goals, inputs, tools/scripts to use, outputs, and edge cases
 - Natural language instructions, like you'd give a mid-level employee
 
 **Layer 2: Orchestration (Decision making)**
 - This is you. Your job: intelligent routing.
-- Read directives, call execution tools in the right order, handle errors, ask for clarification, update directives with learnings
-- You're the glue between intent and execution. E.g you don't try scraping websites yourself—you read `directives/scrape_website.md` and come up with inputs/outputs and then run `execution/scrape_single_site.py`
+- Read workflow directives, call colocated scripts in the right order, handle errors, ask for clarification, update directives with learnings
+- You're the glue between intent and execution. You should route to the correct workflow, then use its `scripts/` folder rather than improvising the implementation from scratch.
 
 **Layer 3: Execution (Doing the work)**
-- Deterministic Python scripts in `execution/`
+- Deterministic scripts live in `workflows/<workflow>/scripts/`
 - Environment variables, api tokens, etc are stored in `.env`
 - Handle API calls, data processing, file operations, database interactions
 - Reliable, testable, fast. Use scripts instead of manual work.
@@ -27,7 +25,7 @@ You operate within a 3-layer architecture that separates concerns to maximize re
 ## Operating Principles
 
 **1. Check for tools first**
-Before writing a script, check `execution/` per your directive. Only create new scripts if none exist.
+Before writing a script, check the target workflow's `scripts/` directory per its directive. Only create new scripts if none exist.
 
 **2. Self-anneal when things break**
 - Read error message and stack trace
@@ -42,7 +40,7 @@ Directives are living documents. When you discover API constraints, better appro
 If the user asks about skills in any form (usage, discovery, installation, setup, identification, search, or operational workflow), read `SKILL_SETUP.md` first and follow it as the source of truth for how skills should be found, installed, set up, used etc.
 
 **5. Skill Usage**
-Always check the `SKILLS.md` file in the `DOCS/` folder to see what specialized capabilities are available to you. Use these skills whenever applicable to the user's request.
+Always check the `SKILLS.md` file in the `docs/` folder to see what specialized capabilities are available to you. Use these skills whenever applicable to the user's request.
 
 ## Self-annealing loop
 
@@ -60,38 +58,14 @@ Errors are learning opportunities. When something breaks:
 - **Intermediates**: Temporary files needed during processing
 
 **Directory structure:**
-- `.tmp/` - All intermediate files (dossiers, scraped data, temp exports). Never commit, always regenerated.
-- `execution/` - Python scripts (the deterministic tools)
-- `directives/` - SOPs in Markdown (the instruction set)
+- `workflows/` - Active workflow source of truth (directives + scripts + workflow docs)
+- `runtime/` - Generated artifacts, working directories, outputs and temp data. Never commit.
+- `skills-local/` - Project-specific local skills that are not already covered by global Codex skills.
+- `archive/do-usuniecia/` - Staging area for retired, duplicate, or suspicious files pending final removal.
 - `.env` - Environment variables and API keys
 - `credentials.json`, `token.json` - Google OAuth credentials (required files, in `.gitignore`)
 
-**Key principle:** Local files are only for processing. Deliverables live in cloud services (Google Sheets, Slides, etc.) where the user can access them. Everything in `.tmp/` can be deleted and regenerated.
-
-## Cloud Webhooks (Modal)
-
-The system supports event-driven execution via Modal webhooks. Each webhook maps to exactly one directive with scoped tool access.
-
-**When user says "add a webhook that...":**
-1. Read `directives/add_webhook.md` for complete instructions
-2. Create the directive file in `directives/`
-3. Add entry to `execution/webhooks.json`
-4. Deploy: `modal deploy execution/modal_webhook.py`
-5. Test the endpoint
-
-**Key files:**
-- `execution/webhooks.json` - Webhook slug → directive mapping
-- `execution/modal_webhook.py` - Modal app (do not modify unless necessary)
-- `directives/add_webhook.md` - Complete setup guide
-
-**Endpoints:**
-- `https://nick-90891--claude-orchestrator-list-webhooks.modal.run` - List webhooks
-- `https://nick-90891--claude-orchestrator-directive.modal.run?slug={slug}` - Execute directive
-- `https://nick-90891--claude-orchestrator-test-email.modal.run` - Test email
-
-**Available tools for webhooks:** `send_email`, `read_sheet`, `update_sheet`
-
-**All webhook activity streams to Slack in real-time.**
+**Key principle:** Repo holds workflow source-of-truth. Runtime output should go to `runtime/`, not to workflow source directories.
 
 ## Summary
 
